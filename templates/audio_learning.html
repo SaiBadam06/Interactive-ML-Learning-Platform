@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Audio Learning - ML Learning Assistant{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-headphones"></i> Audio Learning</h1>
+        <p>Listen to AI-generated audio explanations of ML concepts - perfect for learning on the go!</p>
+    </div>
+
+    <div class="content-wrapper">
+        <!-- Input Section -->
+        <div class="input-section card">
+            <h2>What would you like to listen to?</h2>
+            
+            <form id="audioForm">
+                <div class="form-group">
+                    <label for="topic">
+                        <i class="fas fa-lightbulb"></i> Machine Learning Topic
+                    </label>
+                    <input 
+                        type="text" 
+                        id="topic" 
+                        name="topic" 
+                        class="form-control" 
+                        placeholder="e.g., support vector machines, neural networks, gradient descent"
+                        required
+                    >
+                    <small class="form-hint">Enter any ML topic you want to learn about through audio</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="length">
+                        <i class="fas fa-sliders-h"></i> Audio Length
+                    </label>
+                    <select id="length" name="length" class="form-control">
+                        <option value="Brief">Brief - 2-3 minutes</option>
+                        <option value="Detailed" selected>Detailed - 5-7 minutes</option>
+                        <option value="Comprehensive">Comprehensive - 10+ minutes</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-large">
+                    <i class="fas fa-rocket"></i> Generate Audio
+                </button>
+            </form>
+        </div>
+
+        <!-- Output Section -->
+        <div id="outputSection" class="output-section" style="display: none;">
+            <!-- Audio Player -->
+            <div class="card audio-player-card">
+                <div class="output-header">
+                    <h2><i class="fas fa-music"></i> Audio Lesson</h2>
+                    <div class="output-actions">
+                        <button id="downloadAudioBtn" class="btn btn-secondary">
+                            <i class="fas fa-download"></i> Download MP3
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="audioPlayer" class="audio-player">
+                    <!-- Audio will be dynamically inserted here -->
+                </div>
+
+                <div class="audio-info">
+                    <p><i class="fas fa-info-circle"></i> Listen to this explanation anywhere - download the MP3 for offline learning!</p>
+                </div>
+            </div>
+
+            <!-- Script -->
+            <div class="card">
+                <div class="output-header">
+                    <h2><i class="fas fa-file-alt"></i> Audio Script</h2>
+                    <div class="output-actions">
+                        <button id="copyScriptBtn" class="btn btn-secondary">
+                            <i class="fas fa-copy"></i> Copy Script
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="script" class="script-content"></div>
+            </div>
+
+            <!-- Explanation -->
+            <div class="card">
+                <div class="output-header">
+                    <h2><i class="fas fa-book"></i> Additional Details</h2>
+                </div>
+                <div id="explanation" class="explanation-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Learning Tips -->
+    <div class="tips-section">
+        <h3><i class="fas fa-lightbulb"></i> Audio Learning Tips</h3>
+        <div class="tips-grid">
+            <div class="tip-card">
+                <i class="fas fa-walking"></i>
+                <h4>Learn While Moving</h4>
+                <p>Download the audio and listen during walks, commutes, or workouts</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-redo"></i>
+                <h4>Repeat & Retain</h4>
+                <p>Listen multiple times to reinforce your understanding</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-notes-medical"></i>
+                <h4>Take Notes</h4>
+                <p>Pause and jot down key points for better retention</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/audio_learning.js') }}"></script>
+{% endblock %}

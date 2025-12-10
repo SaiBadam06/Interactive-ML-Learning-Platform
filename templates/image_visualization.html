@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Image Visualization - ML Learning Assistant{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-image"></i> Image Visualization</h1>
+        <p>Generate AI-powered visual diagrams and illustrations to understand ML concepts intuitively</p>
+    </div>
+
+    <div class="content-wrapper">
+        <!-- Input Section -->
+        <div class="input-section card">
+            <h2>What would you like to visualize?</h2>
+            
+            <form id="imageForm">
+                <div class="form-group">
+                    <label for="topic">
+                        <i class="fas fa-lightbulb"></i> Machine Learning Topic
+                    </label>
+                    <input 
+                        type="text" 
+                        id="topic" 
+                        name="topic" 
+                        class="form-control" 
+                        placeholder="e.g., convolutional neural network architecture, decision tree, clustering"
+                        required
+                    >
+                    <small class="form-hint">Enter any ML concept you want to see visualized</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="length">
+                        <i class="fas fa-sliders-h"></i> Detail Level
+                    </label>
+                    <select id="length" name="length" class="form-control">
+                        <option value="Brief">Brief - Simple diagrams</option>
+                        <option value="Detailed" selected>Detailed - Comprehensive visuals</option>
+                        <option value="Comprehensive">Comprehensive - Technical illustrations</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="backend">
+                        <i class="fas fa-palette"></i> Image Generation Backend
+                    </label>
+                    <select id="backend" name="backend" class="form-control">
+                        <option value="Google Gemini (Fast & Free)" selected>Google Gemini (Fast & Free)</option>
+                        <option value="HuggingFace Stable Diffusion">HuggingFace Stable Diffusion (SDXL)</option>
+                    </select>
+                    <small class="form-hint">API keys are configured in .env file</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-large">
+                    <i class="fas fa-rocket"></i> Generate Images
+                </button>
+            </form>
+        </div>
+
+        <!-- Output Section -->
+        <div id="outputSection" class="output-section" style="display: none;">
+            <!-- Explanation -->
+            <div class="card">
+                <div class="output-header">
+                    <h2><i class="fas fa-file-alt"></i> Explanation</h2>
+                </div>
+                <div id="explanation" class="explanation-content"></div>
+            </div>
+
+            <!-- Images -->
+            <div class="card">
+                <div class="output-header">
+                    <h2><i class="fas fa-images"></i> Generated Visualizations</h2>
+                </div>
+                
+                <div id="imagesGrid" class="images-grid">
+                    <!-- Images will be dynamically inserted here -->
+                </div>
+            </div>
+
+            <!-- Image Prompts -->
+            <div class="card">
+                <div class="output-header">
+                    <h2><i class="fas fa-comment-dots"></i> Image Prompts Used</h2>
+                </div>
+                <div id="prompts" class="prompts-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visual Learning Tips -->
+    <div class="tips-section">
+        <h3><i class="fas fa-lightbulb"></i> Visual Learning Tips</h3>
+        <div class="tips-grid">
+            <div class="tip-card">
+                <i class="fas fa-eye"></i>
+                <h4>Visual Memory</h4>
+                <p>Images help create lasting mental associations with complex concepts</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-project-diagram"></i>
+                <h4>Architecture Understanding</h4>
+                <p>Perfect for understanding neural network architectures and data flow</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-share-alt"></i>
+                <h4>Share & Discuss</h4>
+                <p>Use generated diagrams in presentations and study groups</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/image_visualization.js') }}"></script>
+{% endblock %}

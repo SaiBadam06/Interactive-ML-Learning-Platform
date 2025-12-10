@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - ML Learning Assistant{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-cog"></i> Settings</h1>
+        <p>Configure your API keys and preferences</p>
+    </div>
+
+    <div class="settings-wrapper">
+        <!-- API Keys Section -->
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-key"></i> API Keys Configuration</h2>
+                <p>API keys are now configured in the .env file on the server</p>
+            </div>
+
+            <div class="api-config-info">
+                <div class="config-item">
+                    <i class="fas fa-file-code"></i>
+                    <div>
+                        <h4>Configuration File</h4>
+                        <p>API keys are stored in the <code>.env</code> file in the project root directory.</p>
+                    </div>
+                </div>
+
+                <div class="config-item">
+                    <i class="fab fa-google"></i>
+                    <div>
+                        <h4>Google Gemini API Key</h4>
+                        <p>Set <code>GEMINI_API_KEY</code> in the .env file.</p>
+                        <small class="form-hint">
+                            <i class="fas fa-info-circle"></i> Required for all features.
+                            <a href="https://makersuite.google.com/app/apikey" target="_blank">Get a free API key</a>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="config-item">
+                    <i class="fas fa-brain"></i>
+                    <div>
+                        <h4>HuggingFace API Key (Optional)</h4>
+                        <p>Set <code>HF_API_KEY</code> in the .env file for Stable Diffusion image generation.</p>
+                        <small class="form-hint">
+                            <i class="fas fa-info-circle"></i> Optional - for SDXL image generation.
+                            <a href="https://huggingface.co/settings/tokens" target="_blank">Get a free API key</a>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="config-item">
+                    <i class="fas fa-code"></i>
+                    <div>
+                        <h4>Example .env Configuration</h4>
+                        <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px; margin-top: 10px;">GEMINI_API_KEY=your_gemini_api_key_here
+HF_API_KEY=your_huggingface_api_key_here
+SECRET_KEY=your_secret_key_here
+FLASK_ENV=development
+FLASK_DEBUG=True</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Information -->
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-info-circle"></i> Model Information</h2>
+            </div>
+            
+            <div class="model-info">
+                <div class="model-card">
+                    <div class="model-icon gemini-icon">
+                        <i class="fab fa-google"></i>
+                    </div>
+                    <h3>Google Gemini 2.0 Flash</h3>
+                    <p>Fast, efficient AI model for text generation and explanations</p>
+                    <ul>
+                        <li><i class="fas fa-check"></i> Free to use</li>
+                        <li><i class="fas fa-check"></i> Low latency</li>
+                        <li><i class="fas fa-check"></i> High quality outputs</li>
+                    </ul>
+                </div>
+
+                <div class="model-card">
+                    <div class="model-icon image-icon">
+                        <i class="fas fa-image"></i>
+                    </div>
+                    <h3>Gemini Image Generation</h3>
+                    <p>Generate educational diagrams and visualizations</p>
+                    <ul>
+                        <li><i class="fas fa-check"></i> Fast generation</li>
+                        <li><i class="fas fa-check"></i> Educational focus</li>
+                        <li><i class="fas fa-check"></i> High resolution</li>
+                    </ul>
+                </div>
+
+                <div class="model-card">
+                    <div class="model-icon sd-icon">
+                        <i class="fas fa-paint-brush"></i>
+                    </div>
+                    <h3>Stable Diffusion XL</h3>
+                    <p>Alternative image generation with Stable Diffusion</p>
+                    <ul>
+                        <li><i class="fas fa-check"></i> 1024x1024 resolution</li>
+                        <li><i class="fas fa-check"></i> Detailed outputs</li>
+                        <li><i class="fas fa-check"></i> Customizable</li>
+                    </ul>
+                </div>
+            </div>
+
+            <button id="modelInfoBtn" class="btn btn-secondary">
+                <i class="fas fa-code"></i> View Technical Details
+            </button>
+        </div>
+
+        <!-- Privacy & Security -->
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-shield-alt"></i> Privacy & Security</h2>
+            </div>
+            
+            <div class="privacy-content">
+                <div class="privacy-item">
+                    <i class="fas fa-lock"></i>
+                    <div>
+                        <h4>Local Storage</h4>
+                        <p>Your API keys are stored only in your browser's local storage and never transmitted to our servers.</p>
+                    </div>
+                </div>
+
+                <div class="privacy-item">
+                    <i class="fas fa-user-shield"></i>
+                    <div>
+                        <h4>No Data Collection</h4>
+                        <p>We don't collect, store, or share any of your personal information or learning data.</p>
+                    </div>
+                </div>
+
+                <div class="privacy-item">
+                    <i class="fas fa-code-branch"></i>
+                    <div>
+                        <h4>Open Source</h4>
+                        <p>This project is open source. You can review the code and even host it yourself.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Start Guide -->
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-rocket"></i> Quick Start Guide</h2>
+            </div>
+
+            <div class="quick-start">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Get API Keys</h4>
+                        <p>Sign up for free Google Gemini API key (required) and optionally HuggingFace key</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Configure .env File</h4>
+                        <p>Add your API keys to the .env file in the project root directory</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Start the Application</h4>
+                        <p>Run the Flask application using <code>python app.py</code></p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>Start Learning</h4>
+                        <p>Choose a learning mode and explore AI, ML, and Deep Learning topics!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Model Info Modal -->
+<div id="modelModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Technical Model Details</h2>
+        <pre id="modelDetails" class="model-details-content"></pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

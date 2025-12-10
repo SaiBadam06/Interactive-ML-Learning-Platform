@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Text Explanation - ML Learning Assistant{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-book"></i> Text Explanation</h1>
+        <p>Get comprehensive text-based explanations of any Machine Learning topic</p>
+    </div>
+
+    <div class="content-wrapper">
+        <!-- Input Section -->
+        <div class="input-section card">
+            <h2>What would you like to learn?</h2>
+            
+            <form id="textForm">
+                <div class="form-group">
+                    <label for="topic">
+                        <i class="fas fa-lightbulb"></i> Machine Learning Topic
+                    </label>
+                    <input 
+                        type="text" 
+                        id="topic" 
+                        name="topic" 
+                        class="form-control" 
+                        placeholder="e.g., neural networks, decision trees, clustering, reinforcement learning"
+                        required
+                    >
+                    <small class="form-hint">Enter any ML concept, algorithm, or technique you want to understand</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="length">
+                        <i class="fas fa-sliders-h"></i> Explanation Depth
+                    </label>
+                    <select id="length" name="length" class="form-control">
+                        <option value="Brief">Brief - Quick overview (2-3 paragraphs)</option>
+                        <option value="Detailed" selected>Detailed - In-depth explanation (5-7 paragraphs)</option>
+                        <option value="Comprehensive">Comprehensive - Complete guide (10+ paragraphs)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-large">
+                    <i class="fas fa-rocket"></i> Generate Explanation
+                </button>
+            </form>
+        </div>
+
+        <!-- Output Section -->
+        <div id="outputSection" class="output-section card" style="display: none;">
+            <div class="output-header">
+                <h2><i class="fas fa-file-alt"></i> Your Explanation</h2>
+                <div class="output-actions">
+                    <button id="copyBtn" class="btn btn-secondary">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <button id="downloadBtn" class="btn btn-secondary">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                </div>
+            </div>
+            
+            <div id="explanation" class="explanation-content"></div>
+        </div>
+    </div>
+
+    <!-- Tips Section -->
+    <div class="tips-section">
+        <h3><i class="fas fa-lightbulb"></i> Tips for Better Learning</h3>
+        <div class="tips-grid">
+            <div class="tip-card">
+                <i class="fas fa-search"></i>
+                <h4>Be Specific</h4>
+                <p>Use clear, specific terms like "convolutional neural networks" instead of just "CNN"</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-layer-group"></i>
+                <h4>Build Foundation</h4>
+                <p>Start with basic concepts before moving to advanced topics</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-redo"></i>
+                <h4>Iterate</h4>
+                <p>Don't hesitate to ask follow-up questions for clarity</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/text_explanation.js') }}"></script>
+{% endblock %}

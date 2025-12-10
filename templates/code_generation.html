@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Code Generation - ML Learning Assistant{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-code"></i> Code Generation</h1>
+        <p>Generate working Python code with detailed explanations for any ML concept</p>
+    </div>
+
+    <div class="content-wrapper">
+        <!-- Input Section -->
+        <div class="input-section card">
+            <h2>What code would you like to generate?</h2>
+            
+            <form id="codeForm">
+                <div class="form-group">
+                    <label for="topic">
+                        <i class="fas fa-lightbulb"></i> Machine Learning Topic
+                    </label>
+                    <input 
+                        type="text" 
+                        id="topic" 
+                        name="topic" 
+                        class="form-control" 
+                        placeholder="e.g., linear regression, random forest, k-means clustering"
+                        required
+                    >
+                    <small class="form-hint">Enter the ML algorithm or concept you want code for</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="length">
+                        <i class="fas fa-sliders-h"></i> Code Complexity
+                    </label>
+                    <select id="length" name="length" class="form-control">
+                        <option value="Brief">Brief - Simple example (20-30 lines)</option>
+                        <option value="Detailed" selected>Detailed - Full implementation (50-100 lines)</option>
+                        <option value="Comprehensive">Comprehensive - Production-ready (100+ lines)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-large">
+                    <i class="fas fa-rocket"></i> Generate Code
+                </button>
+            </form>
+        </div>
+
+        <!-- Output Section -->
+        <div id="outputSection" class="output-section" style="display: none;">
+            <!-- Explanation -->
+            <div class="card">
+                <div class="output-header">
+                    <h2><i class="fas fa-file-alt"></i> Explanation</h2>
+                </div>
+                <div id="explanation" class="explanation-content"></div>
+            </div>
+
+            <!-- Code -->
+            <div class="card">
+                <div class="output-header">
+                    <h2><i class="fas fa-code"></i> Python Code</h2>
+                    <div class="output-actions">
+                        <button id="copyCodeBtn" class="btn btn-secondary">
+                            <i class="fas fa-copy"></i> Copy Code
+                        </button>
+                        <button id="downloadCodeBtn" class="btn btn-secondary">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="code-container">
+                    <pre><code id="codeContent" class="language-python"></code></pre>
+                </div>
+            </div>
+
+            <!-- Dependencies -->
+            <div id="dependenciesSection" class="card" style="display: none;">
+                <div class="output-header">
+                    <h2><i class="fas fa-box"></i> Required Dependencies</h2>
+                </div>
+                <div id="dependencies" class="dependencies-content"></div>
+            </div>
+
+            <!-- Execution Guide -->
+            <div class="card">
+                <div class="output-header">
+                    <h2><i class="fas fa-play-circle"></i> How to Run This Code</h2>
+                </div>
+                
+                <div class="execution-guide">
+                    <div class="execution-tabs">
+                        <button class="tab-btn active" data-tab="colab">
+                            <i class="fab fa-google"></i> Google Colab
+                        </button>
+                        <button class="tab-btn" data-tab="local">
+                            <i class="fas fa-laptop"></i> Local Environment
+                        </button>
+                        <button class="tab-btn" data-tab="jupyter">
+                            <i class="fas fa-book"></i> Jupyter Notebook
+                        </button>
+                    </div>
+
+                    <div id="colabTab" class="tab-content active">
+                        <h4>Google Colab (Recommended)</h4>
+                        <ol>
+                            <li>Click "Copy Code" above</li>
+                            <li>Open <a href="https://colab.research.google.com/" target="_blank">Google Colab</a></li>
+                            <li>Create a new notebook</li>
+                            <li>Paste the code into a cell</li>
+                            <li>Run with <kbd>Shift</kbd> + <kbd>Enter</kbd></li>
+                        </ol>
+                        <a href="https://colab.research.google.com/" target="_blank" class="btn btn-primary">
+                            <i class="fas fa-external-link-alt"></i> Open Google Colab
+                        </a>
+                    </div>
+
+                    <div id="localTab" class="tab-content">
+                        <h4>Local Python Environment</h4>
+                        <ol>
+                            <li>Save the code to a <code>.py</code> file</li>
+                            <li>Install dependencies (see above)</li>
+                            <li>Run: <code>python filename.py</code></li>
+                        </ol>
+                    </div>
+
+                    <div id="jupyterTab" class="tab-content">
+                        <h4>Jupyter Notebook</h4>
+                        <ol>
+                            <li>Start Jupyter: <code>jupyter notebook</code></li>
+                            <li>Create a new notebook</li>
+                            <li>Copy code into cells</li>
+                            <li>Run cells sequentially</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/code_generation.js') }}"></script>
+{% endblock %}
