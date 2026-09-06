@@ -24,7 +24,7 @@ ml_learning_assistant/
 │
 ├── 📁 utils/                          # Utility modules
 │   ├── __init__.py                    # Package initializer
-│   ├── genai_utils.py                 # Google Gemini integration
+│   ├── genai_utils.py                 # NVIDIA NIM integration
 │   ├── audio_utils.py                 # Text-to-speech functionality
 │   ├── code_executor.py               # Code execution helpers
 │   └── image_utils.py                 # Image generation utilities
@@ -97,9 +97,9 @@ ml_learning_assistant/
 ## Utility Modules (`utils/`)
 
 ### `genai_utils.py`
-**Purpose**: Google Gemini AI integration
+**Purpose**: NVIDIA NIM AI integration
 **Functions**:
-- `call_genai()` - Main function to call Gemini API
+- `call_genai()` - Main function to call NVIDIA NIM API
 - Prompt construction
 - Response parsing
 - Error handling and retries
@@ -131,15 +131,11 @@ ml_learning_assistant/
 **Purpose**: Image generation
 **Functions**:
 - `generate_images()` - Main image generation
-- `_gen_with_gemini()` - Gemini backend
-- `_gen_with_hf()` - HuggingFace backend
 - `_enhance_educational_prompt()` - Prompt enhancement
 - `get_model_info()` - Model information
 
-**Backends**:
-- Google Gemini 2.0 Flash (Image Generation)
-- Imagen 3.0 (Fallback)
-- Stable Diffusion XL (HuggingFace)
+**Backend**:
+- FLUX.1-dev via NVIDIA NIM
 
 ---
 
@@ -251,8 +247,8 @@ Each page has its own JavaScript file that:
 **Packages**:
 - Flask - Web framework
 - python-dotenv - Environment variables
-- google-generativeai - Gemini API
-- google-genai - Gemini SDK
+- google-generativeai - NVIDIA NIM API
+- google-genai - NVIDIA NIM SDK
 - gTTS - Text-to-speech
 - requests - HTTP client
 - Pillow - Image processing
@@ -261,8 +257,8 @@ Each page has its own JavaScript file that:
 ### `.env.example`
 **Purpose**: Environment variables template
 **Variables**:
-- `GEMINI_API_KEY` - Google Gemini API key
-- `HF_API_KEY` - HuggingFace API key
+- `NVIDIA_API_KEY` - NVIDIA NIM API key
+- `NVIDIA_API_KEY` - NVIDIA NIM API key
 - `SECRET_KEY` - Flask secret key
 - `FLASK_ENV` - Environment (development/production)
 - `FLASK_DEBUG` - Debug mode flag
@@ -338,7 +334,7 @@ Each page has its own JavaScript file that:
 1. User enters topic in `text_explanation.html`
 2. `text_explanation.js` sends AJAX request
 3. `app.py` receives request at `/api/generate-text`
-4. `genai_utils.call_genai()` calls Gemini API
+4. `genai_utils.call_genai()` calls NVIDIA NIM API
 5. Response parsed and returned to frontend
 6. `text_explanation.js` displays content
 

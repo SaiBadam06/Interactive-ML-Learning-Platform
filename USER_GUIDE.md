@@ -23,8 +23,8 @@ Complete guide to using all features of the ML Learning Assistant.
 
 2. **Configure API Keys**
    - Click "Settings" in navigation
-   - Enter your Google Gemini API key
-   - Optionally add HuggingFace key
+   - Enter your NVIDIA NIM API key
+   - Optionally add NVIDIA NIM key
    - Click "Save Settings"
 
 3. **Explore the Homepage**
@@ -272,8 +272,8 @@ Generate AI-powered diagrams and technical illustrations to understand ML concep
    - **Comprehensive**: Technical illustrations
 
 4. **Choose Backend**
-   - **Google Gemini**: Fast, free, recommended
-   - **Stable Diffusion**: High quality, requires HF key
+   - **NVIDIA NIM**: Fast, free, recommended
+   - **FLUX.1-dev**: High quality, requires HF key
 
 5. **Generate Images**
    - Click "Generate Images"
@@ -297,7 +297,7 @@ Generate AI-powered diagrams and technical illustrations to understand ML concep
 
 ### Backend Comparison
 
-| Feature | Google Gemini | Stable Diffusion |
+| Feature | NVIDIA NIM | FLUX.1-dev |
 |---------|--------------|------------------|
 | Speed | Fast (15-20s) | Slower (30-45s) |
 | Quality | Good | Excellent |
@@ -320,8 +320,8 @@ Generate AI-powered diagrams and technical illustrations to understand ML concep
 
 **Saving Keys**
 1. Go to Settings page
-2. Enter Gemini API key (required)
-3. Enter HuggingFace key (optional)
+2. Enter NVIDIA NIM API key (required)
+3. Enter NVIDIA NIM key (optional)
 4. Click "Save Settings"
 5. Keys stored locally in browser
 
@@ -467,7 +467,7 @@ A: First request loads the model. Subsequent requests are faster.
 A: No, requires internet for API calls. But you can download content for offline review.
 
 **Q: Are there usage limits?**
-A: Depends on your API keys' quotas. Gemini offers generous free tier.
+A: Depends on your API keys' quotas. NVIDIA NIM offers generous free tier.
 
 **Q: Can I request specific code libraries?**
 A: Yes, mention the library in your topic: "linear regression using scikit-learn"

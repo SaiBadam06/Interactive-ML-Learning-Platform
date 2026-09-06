@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const topic = document.getElementById('topic').value.trim();
         const length = document.getElementById('length').value;
-        const backend = document.getElementById('backend').value;
 
         if (!topic) {
             showToast('Please enter a topic', 'error');
@@ -27,8 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     topic,
-                    length,
-                    backend
+                    length
                 })
             });
             

@@ -21,22 +21,6 @@ function showLoading(show = true) {
     }
 }
 
-// Get API key from .env file (server-side)
-// Returns empty string so backend will use .env configuration
-function getApiKey(inputId = 'apiKey') {
-    // API keys are now configured in .env file
-    // Return empty string so backend reads from environment
-    return '';
-}
-
-// Get HF API key from .env file (server-side)
-// Returns empty string so backend will use .env configuration
-function getHFKey(inputId = 'hfKey') {
-    // API keys are now configured in .env file
-    // Return empty string so backend reads from environment
-    return '';
-}
-
 // Copy text to clipboard
 async function copyToClipboard(text) {
     try {
@@ -93,26 +77,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // API keys are now configured in .env file on the server
     // No need to load from localStorage
     
-    // Show/hide HF key based on backend selection
-    const backendSelect = document.getElementById('backend');
-    const hfKeyGroup = document.getElementById('hfKeyGroup');
-    
-    if (backendSelect && hfKeyGroup) {
-        backendSelect.addEventListener('change', (e) => {
-            if (e.target.value === 'HuggingFace Stable Diffusion') {
-                hfKeyGroup.style.display = 'block';
-            } else {
-                hfKeyGroup.style.display = 'none';
-            }
-        });
-    }
 });
 
 // Make functions globally available
 window.showToast = showToast;
 window.showLoading = showLoading;
-window.getApiKey = getApiKey;
-window.getHFKey = getHFKey;
 window.copyToClipboard = copyToClipboard;
 window.downloadTextFile = downloadTextFile;
 window.formatMarkdown = formatMarkdown;

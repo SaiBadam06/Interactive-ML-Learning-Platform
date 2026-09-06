@@ -12,8 +12,8 @@ All notable changes to this project will be documented in this file.
 - Image visualization with AI-generated diagrams
 - Settings page for API key management
 - Responsive web design for mobile and desktop
-- Support for Google Gemini 2.0 Flash
-- Support for Stable Diffusion XL image generation
+- Support for NVIDIA Nemotron 3.5 Lightning 30B
+- Support for FLUX.1-dev image generation
 - Comprehensive documentation (README, INSTALLATION, USER_GUIDE)
 - Error handling and loading states
 - Local storage for API keys
@@ -27,14 +27,14 @@ All notable changes to this project will be documented in this file.
 - **Code Generation**: Working Python implementations with comments
 - **Audio Learning**: MP3 generation for on-the-go learning
 - **Image Visualization**: AI-powered diagrams and illustrations
-- **Multi-backend Support**: Google Gemini and HuggingFace options
+- **Multi-backend Support**: NVIDIA NIM and NVIDIA NIM options
 - **Privacy-First**: Local API key storage, no data collection
 - **User-Friendly UI**: Clean, modern, responsive interface
 - **Educational Focus**: Tailored for learning and understanding
 
 ### Technical Stack
 - Flask 3.0.0
-- Google Generative AI (Gemini 2.0)
+- Google Generative AI (NVIDIA NIM 2.0)
 - gTTS for text-to-speech
 - HTML5, CSS3, JavaScript
 - Responsive design with CSS Grid and Flexbox

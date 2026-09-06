@@ -28,7 +28,7 @@ An intelligent, AI-powered web application for learning Machine Learning concept
 - Natural, conversational audio scripts
 
 ### 🎨 Image Visualization
-- AI-powered diagram generation using Google Gemini or Stable Diffusion
+- AI-powered diagram generation using NVIDIA NIM or FLUX.1-dev
 - Technical illustrations and architecture diagrams
 - Educational infographics
 - Multiple image generation backends
@@ -38,8 +38,8 @@ An intelligent, AI-powered web application for learning Machine Learning concept
 ### Prerequisites
 - Python 3.8 or higher
 - pip (Python package manager)
-- Google Gemini API key (required) - [Get it free here](https://makersuite.google.com/app/apikey)
-- HuggingFace API key (optional, for Stable Diffusion) - [Get it here](https://huggingface.co/settings/tokens)
+- NVIDIA NIM API key (required) - [Get it free here](https://build.nvidia.com)
+- NVIDIA NIM API key (optional, for FLUX.1-dev) - [Get it here](https://build.nvidia.com)
 
 ### Installation
 
@@ -87,8 +87,8 @@ An intelligent, AI-powered web application for learning Machine Learning concept
 
 ### First Time Setup
 1. Navigate to the **Settings** page
-2. Enter your Google Gemini API key (required)
-3. Optionally add HuggingFace API key for Stable Diffusion
+2. Enter your NVIDIA NIM API key (required)
+3. Optionally add NVIDIA NIM API key for FLUX.1-dev
 4. Click "Save Settings" - keys are stored locally in your browser
 
 ### Generating Content
@@ -119,7 +119,7 @@ An intelligent, AI-powered web application for learning Machine Learning concept
 #### Visual Diagrams
 1. Go to the **Image Visualization** page
 2. Enter the concept you want visualized
-3. Choose backend (Gemini recommended for speed)
+3. Choose backend (NVIDIA NIM recommended for speed)
 4. Click "Generate Images"
 5. View AI-generated diagrams and illustrations
 
@@ -134,7 +134,7 @@ ml_learning_assistant/
 │
 ├── utils/                     # Utility modules
 │   ├── __init__.py
-│   ├── genai_utils.py        # Google Gemini integration
+│   ├── genai_utils.py        # NVIDIA NIM integration
 │   ├── audio_utils.py        # Text-to-speech functionality
 │   ├── code_executor.py      # Code execution helpers
 │   └── image_utils.py        # Image generation utilities
@@ -174,8 +174,7 @@ Create a `.env` file based on `.env.example`:
 
 ```env
 # API Keys (Optional - can be set in Settings page)
-GEMINI_API_KEY=your_gemini_api_key_here
-HF_API_KEY=your_huggingface_api_key_here
+NVIDIA_API_KEY=nvapi-your_key_here
 
 # Flask Configuration
 SECRET_KEY=your_secret_key_here
@@ -184,13 +183,13 @@ FLASK_DEBUG=True
 ```
 
 ### API Keys
-- **Gemini API Key**: Required for all features. Get it from [Google AI Studio](https://makersuite.google.com/app/apikey)
-- **HuggingFace API Key**: Optional, only needed if using Stable Diffusion for image generation
+- **NVIDIA NIM API Key**: Required for all features. Get it from [Google AI Studio](https://build.nvidia.com)
+- **NVIDIA NIM API Key**: Optional, only needed if using FLUX.1-dev for image generation
 
 ## 🎨 Features in Detail
 
 ### Intelligent Content Generation
-- Powered by Google Gemini 2.0 Flash for fast, high-quality responses
+- Powered by NVIDIA Nemotron 3.5 Lightning 30B for fast, high-quality responses
 - Context-aware explanations tailored to your learning level
 - Multiple output formats for different learning styles
 
@@ -206,7 +205,7 @@ FLASK_DEBUG=True
 - Optimized for clarity and comprehension
 
 ### Image Generation
-- Two backends: Google Gemini (fast) and Stable Diffusion (high quality)
+- Two backends: NVIDIA NIM (fast) and FLUX.1-dev (high quality)
 - Educational diagram style optimization
 - Technical illustrations and architecture visualizations
 
@@ -241,7 +240,7 @@ pip install gTTS --upgrade
 
 **Issue**: Image generation is slow
 ```bash
-# Solution: Use Gemini backend instead of HuggingFace
+# Solution: Use NVIDIA NIM backend instead of NVIDIA NIM
 # Or wait for model loading (first request is slower)
 ```
 
@@ -268,8 +267,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🙏 Acknowledgments
 
-- **Google Gemini** - For powerful AI text generation
-- **Stability AI** - For Stable Diffusion image generation
+- **NVIDIA NIM** - For powerful AI text generation
+- **Stability AI** - For FLUX.1-dev image generation
 - **Flask** - For the excellent web framework
 - **gTTS** - For text-to-speech capabilities
 

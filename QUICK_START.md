@@ -6,7 +6,7 @@ Get up and running with ML Learning Assistant in 5 minutes!
 
 1. **Computer** running Windows, macOS, or Linux
 2. **Python 3.8+** installed ([Download here](https://www.python.org/downloads/))
-3. **Google Gemini API Key** (Free) - [Get it here](https://makersuite.google.com/app/apikey)
+3. **NVIDIA NIM API Key** (Free) - [Get it here](https://build.nvidia.com)
 4. **10 minutes** of your time
 
 ---
@@ -58,7 +58,7 @@ python app.py
 ## 🔑 First Time Configuration
 
 ### Step 1: Get Your API Key
-1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+1. Visit [Google AI Studio](https://build.nvidia.com)
 2. Sign in with Google
 3. Click "Create API Key"
 4. Copy the key
@@ -99,7 +99,7 @@ That's it! You're ready to go! 🎉
 ### Try Image Visualization
 1. Click "Images" in the navigation
 2. Type: `convolutional neural network architecture`
-3. Select backend: `Google Gemini`
+3. Select backend: `NVIDIA NIM`
 4. Click "Generate Images"
 5. View beautiful diagrams! 🎨
 

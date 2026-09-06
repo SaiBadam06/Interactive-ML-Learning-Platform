@@ -141,7 +141,7 @@ pip install -r requirements.txt
 
 This will install:
 - Flask (web framework)
-- google-generativeai (Gemini API)
+- google-generativeai (NVIDIA NIM API)
 - gTTS (text-to-speech)
 - And other required packages
 
@@ -151,10 +151,10 @@ This will install:
 
 ## API Keys Setup
 
-### Google Gemini API Key (Required)
+### NVIDIA NIM API Key (Required)
 
 1. **Visit Google AI Studio**
-   - Go to [https://makersuite.google.com/app/apikey](https://makersuite.google.com/app/apikey)
+   - Go to [https://build.nvidia.com](https://build.nvidia.com)
    - Sign in with your Google account
 
 2. **Create API Key**
@@ -169,7 +169,7 @@ This will install:
    cp .env.example .env
    
    # Edit .env file
-   # Add your key: GEMINI_API_KEY=your_actual_key_here
+   # Add your key: NVIDIA_API_KEY=your_actual_key_here
    ```
 
    **Option B: Using Settings Page (Recommended)**
@@ -178,12 +178,12 @@ This will install:
    - Enter your API key
    - Click "Save Settings"
 
-### HuggingFace API Key (Optional)
+### NVIDIA NIM API Key (Optional)
 
-Only needed if you want to use Stable Diffusion for image generation.
+Only needed if you want to use FLUX.1-dev for image generation.
 
-1. **Visit HuggingFace**
-   - Go to [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+1. **Visit NVIDIA NIM**
+   - Go to [https://build.nvidia.com](https://build.nvidia.com)
    - Create account if needed
 
 2. **Create Token**
@@ -228,8 +228,8 @@ http://127.0.0.1:5000
 ### Step 3: Configure API Keys
 
 1. Click on "Settings" in the navigation
-2. Enter your Gemini API key
-3. Optionally enter HuggingFace key
+2. Enter your NVIDIA NIM API key
+3. Optionally enter NVIDIA NIM key
 4. Click "Save Settings"
 
 ### Step 4: Start Learning!
@@ -317,8 +317,8 @@ lsof -ti:5000 | xargs kill -9
 ### Issue: Slow image generation
 
 **Solution:**
-1. Use Gemini backend instead of HuggingFace
-2. First request to HuggingFace is always slower (model loading)
+1. Use NVIDIA NIM backend instead of NVIDIA NIM
+2. First request to NVIDIA NIM is always slower (model loading)
 3. Subsequent requests will be faster
 
 ### Issue: Audio not playing
@@ -382,7 +382,7 @@ Run this checklist:
 - [ ] Python 3.8+ installed
 - [ ] Virtual environment created and activated
 - [ ] Dependencies installed without errors
-- [ ] Gemini API key obtained
+- [ ] NVIDIA NIM API key obtained
 - [ ] Application starts without errors
 - [ ] Can access http://localhost:5000
 - [ ] Can generate text explanations

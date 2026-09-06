@@ -80,7 +80,7 @@ def generate_text():
         data = request.get_json()
         topic = data.get('topic', '')
         length = data.get('length', 'Brief')
-        api_key = data.get('api_key', os.getenv('GEMINI_API_KEY', ''))
+        api_key = data.get('api_key', os.getenv('NVIDIA_API_KEY', ''))
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -111,7 +111,7 @@ def generate_code():
         data = request.get_json()
         topic = data.get('topic', '')
         length = data.get('length', 'Brief')
-        api_key = data.get('api_key', os.getenv('GEMINI_API_KEY', ''))
+        api_key = data.get('api_key', os.getenv('NVIDIA_API_KEY', ''))
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -152,7 +152,7 @@ def generate_audio():
         data = request.get_json()
         topic = data.get('topic', '')
         length = data.get('length', 'Brief')
-        api_key = data.get('api_key', os.getenv('GEMINI_API_KEY', ''))
+        api_key = data.get('api_key', os.getenv('NVIDIA_API_KEY', ''))
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -191,9 +191,7 @@ def generate_images_api():
         data = request.get_json()
         topic = data.get('topic', '')
         length = data.get('length', 'Brief')
-        api_key = data.get('api_key', os.getenv('GEMINI_API_KEY', ''))
-        hf_key = data.get('hf_key', os.getenv('HF_API_KEY', ''))
-        backend = data.get('backend', 'Google Gemini (Fast & Free)')
+        api_key = data.get('api_key', os.getenv('NVIDIA_API_KEY', ''))
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -210,7 +208,7 @@ def generate_images_api():
             # Generate images
             image_urls = []
             if image_prompts:
-                image_urls = generate_images(image_prompts, api_key, hf_key, backend)
+                image_urls = generate_images(image_prompts, api_key)
             
             return jsonify({
                 'success': True,
