@@ -2,5 +2,5 @@ Flask==3.0.0
 python-dotenv==1.0.0
 gTTS==2.4.0
 requests==2.31.0
-Pillow
+Pillow==12.3.0
 Werkzeug==3.0.1
