@@ -58,7 +58,7 @@ def save_code_to_file(code, topic):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_topic = "".join(c if c.isalnum() else "_" for c in topic)[:30]
         filename = f"{safe_topic}_{timestamp}.py"
-        filepath = os.path.join('generated_code', filename)
+        filepath = os.path.join(os.getenv('DATA_DIR', '.'), 'generated_code', filename)
         
         # Save code
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -120,7 +120,7 @@ def delete_old_code_files(max_age_hours=24):
         max_age_hours: Maximum age of files to keep in hours
     """
     try:
-        code_dir = 'generated_code'
+        code_dir = os.path.join(os.getenv('DATA_DIR', '.'), 'generated_code')
         if not os.path.exists(code_dir):
             return
         

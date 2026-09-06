@@ -1370,3 +1370,61 @@ body {
         padding: 20px;
     }
 }
+
+/* Follow-up questions */
+.follow-up { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid #e5e7eb; }
+.follow-up h3 { font-size: 1.05rem; margin-bottom: .25rem; }
+.follow-up-hint { color: #6b7280; font-size: .875rem; margin-bottom: .75rem; }
+.follow-up-thread { display: flex; flex-direction: column; gap: .5rem; }
+.follow-up-form { display: flex; gap: .5rem; margin-top: .75rem; }
+.follow-up-form input { flex: 1; min-width: 0; }
+.follow-up-msg { padding: .65rem .9rem; border-radius: 10px; line-height: 1.55; }
+.follow-up-msg.user { background: #eef2ff; align-self: flex-end; max-width: 85%; }
+.follow-up-msg.assistant { background: #f3f4f6; }
+.follow-up-msg p { margin: 0 0 .5rem; }
+.follow-up-msg p:last-child { margin-bottom: 0; }
+@media (max-width: 640px) {
+  .follow-up-form { flex-direction: column; }
+  .follow-up-msg.user { max-width: 100%; }
+}
+
+/* Structured walkthrough */
+.explanation-content h4 {
+    margin: 1.4rem 0 .5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #4338ca;
+    padding-bottom: .3rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+.explanation-content h4:first-child { margin-top: 0; }
+.explanation-content ul { margin: .5rem 0 .75rem 1.25rem; }
+.explanation-content li { margin-bottom: .35rem; line-height: 1.6; }
+.explanation-content p { margin-bottom: .75rem; line-height: 1.7; }
+.follow-up-msg h4 { margin: .5rem 0 .25rem; font-size: .95rem; }
+
+/* Accessibility and responsive fixes */
+#imagesGrid img,
+.image-item img { max-width: 100%; height: auto; display: block; border-radius: 8px; }
+
+/* Long generated text must never push the page sideways */
+.explanation-content, .script-content, .prompt-text { overflow-wrap: anywhere; }
+
+/* Visible keyboard focus (was relying on the browser default, removed by resets) */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 3px solid #4338ca;
+    outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+    /* 44px is the minimum comfortable touch target */
+    .btn, .nav-toggle, .follow-up-form button { min-height: 44px; }
+    .nav-toggle { min-width: 44px; }
+    .code-container pre, .code-container code { font-size: .8rem; }
+    #imagesGrid { grid-template-columns: 1fr !important; }
+    .output-actions { flex-wrap: wrap; gap: .5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

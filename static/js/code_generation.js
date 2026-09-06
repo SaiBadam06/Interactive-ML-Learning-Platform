@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Display code
                 currentCode = data.code;
                 codeContent.textContent = data.code;
+                if (window.Prism) Prism.highlightElement(codeContent);
                 
                 // Display dependencies
                 if (data.dependencies && data.dependencies.length > 0) {

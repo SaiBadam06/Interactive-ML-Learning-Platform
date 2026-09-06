@@ -1,0 +1,7 @@
+.env
+generated_audio
+generated_code
+uploads
+__pycache__
+*.pyc
+.git

@@ -38,6 +38,23 @@ def clean_audio_script(text):
 
     return text
 
+# gTTS produces roughly 750 bytes of MP3 per character of script. The API
+# returns the audio inline as a data URI, and serverless hosts cap the response
+# body a few MB, so a long "Comprehensive" script has to be trimmed.
+MAX_TTS_CHARS = 3500
+
+
+def _trim_to_sentence(text, limit):
+    """Cut to at most `limit` characters, ending on a sentence boundary."""
+    if len(text) <= limit:
+        return text
+    window = text[:limit]
+    cut = max(window.rfind(". "), window.rfind("! "), window.rfind("? "))
+    trimmed = window[:cut + 1] if cut > limit // 2 else window
+    logger.info(f"Audio script trimmed from {len(text)} to {len(trimmed)} chars for TTS")
+    return trimmed.strip()
+
+
 def text_to_audio(text, topic="ml_topic"):
     """
     Converts a string of text into an MP3 audio file using gTTS.
@@ -54,6 +71,7 @@ def text_to_audio(text, topic="ml_topic"):
     try:
         # Clean the text to remove stage directions
         cleaned_text = clean_audio_script(text)
+        cleaned_text = _trim_to_sentence(cleaned_text, MAX_TTS_CHARS)
 
         if not cleaned_text or not cleaned_text.strip():
             logger.warning("Text became empty after cleaning.")
@@ -63,7 +81,7 @@ def text_to_audio(text, topic="ml_topic"):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_topic = "".join(c if c.isalnum() else "_" for c in topic)[:30]
         filename = f"{safe_topic}_{timestamp}.mp3"
-        filepath = os.path.join('generated_audio', filename)
+        filepath = os.path.join(os.getenv('DATA_DIR', '.'), 'generated_audio', filename)
 
         # Generate audio with cleaned text
         # Using tld='com' for US English accent which sounds more natural
@@ -85,7 +103,7 @@ def delete_old_audio_files(max_age_hours=24):
         max_age_hours: Maximum age of files to keep in hours
     """
     try:
-        audio_dir = 'generated_audio'
+        audio_dir = os.path.join(os.getenv('DATA_DIR', '.'), 'generated_audio')
         if not os.path.exists(audio_dir):
             return
         

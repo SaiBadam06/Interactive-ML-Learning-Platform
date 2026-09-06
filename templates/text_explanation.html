@@ -62,6 +62,20 @@
             </div>
             
             <div id="explanation" class="explanation-content"></div>
+        
+            <!-- Ask a follow-up -->
+            <div class="card follow-up-card">
+                <div class="follow-up" id="followUp">
+                    <h3><i class="fas fa-comments"></i> Ask a follow-up</h3>
+                    <p class="follow-up-hint">Stuck on a step? Ask about anything above.</p>
+                    <div id="followUpThread" class="follow-up-thread"></div>
+                    <form id="followUpForm" class="follow-up-form" autocomplete="off">
+                        <input type="text" id="followUpInput" class="form-control" maxlength="500" required
+                               placeholder="e.g. Can you give a simpler analogy?   What is the intuition here?">
+                        <button type="submit" class="btn btn-primary">Ask</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 

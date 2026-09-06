@@ -1,5 +1,7 @@
-import requests
+import ast
+import builtins
 import re
+import requests
 import time
 import logging
 
@@ -7,7 +9,158 @@ logger = logging.getLogger(__name__)
 
 # NVIDIA NIM chat endpoint (OpenAI-compatible). Free tier, ~40 req/min.
 NIM_CHAT_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
-NIM_TEXT_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
+NIM_TEXT_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"   # best prose, 15-40s
+NIM_CODE_MODEL = "meta/muse-glimmer-30b"                     # 3-6s, reliable code fences
+# deepseek-v4-pro (178s) and kimi-k3 (timeout) were measured too slow on the free tier.
+# First entry is tried first; the next is used if the artifact the mode needs is missing.
+# muse-glimmer is ~5x faster but intermittently answers in prose with no
+# ```python fence, costing a wasted round-trip, so nemotron leads everywhere and
+# muse is the fallback. Follow-ups use muse first: they are short and latency shows.
+DEFAULT_MODELS = [NIM_TEXT_MODEL, NIM_CODE_MODEL]
+NIM_MODELS = {}
+
+
+def _chat(api_key, messages, model, max_tokens=4096, temperature=0.7):
+    """One NIM chat call. Returns the content string, or None on failure."""
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "top_p": 0.95,
+        "max_tokens": max_tokens,
+        # Both models are reasoners and otherwise stream their scratchpad into
+        # `content`; learners only want the answer.
+        "chat_template_kwargs": {"thinking": False},
+    }
+    for attempt in range(3):
+        try:
+            response = requests.post(NIM_CHAT_URL, headers=headers, json=payload, timeout=150)
+            if response.status_code == 429:
+                logger.warning(f"Rate limited by NIM ({model}); retry {attempt + 1}/3")
+                time.sleep(10 * (attempt + 1))
+                continue
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"].get("content") or ""
+            return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+        except Exception as e:
+            logger.error(f"NIM call failed ({model}): {e}")
+            return None
+    return None
+
+
+def call_followup(api_key, topic, context, history, question):
+    """Answer a follow-up question about material the learner was just shown."""
+    system = (
+        f"You are a patient tutor. The learner is studying: {topic or 'a computer science topic'}.\n"
+        "Here is the material they were shown:\n\n"
+        f"{context[:6000]}\n\n"
+        "Answer follow-up questions about this material concretely and briefly. "
+        "If asked about a specific line of code, quote that line first, then explain it. "
+        "Plain text only: no markdown symbols, normal sentence case."
+    )
+    messages = [{"role": "system", "content": system}]
+    messages += [{"role": m["role"], "content": str(m["content"])[:4000]}
+                 for m in history[-10:]
+                 if isinstance(m, dict) and m.get("role") in ("user", "assistant")]
+    messages.append({"role": "user", "content": question})
+    for model in (NIM_CODE_MODEL, NIM_TEXT_MODEL):   # fast one first
+        answer = _chat(api_key, messages, model, max_tokens=1500)
+        if answer:
+            return answer
+    return None
+
+def _code_smells(code):
+    """
+    Static checks for the two ways generated programs actually broke in testing:
+    a call to a function that was never defined (NameError at runtime), and a
+    while loop with no exit (the request hangs). Purely an AST inspection - the
+    code is never executed here.
+
+    Returns a list of human-readable problems; empty means it looks runnable.
+    """
+    problems = []
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return [f"does not parse: {e.msg}"]
+
+    defined = set(dir(builtins))
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            defined.add(node.name)
+            defined.update(a.arg for a in getattr(node.args, "args", []) if hasattr(node, "args"))
+        elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            defined.add(node.id)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                defined.add((alias.asname or alias.name).split(".")[0])
+        elif isinstance(node, ast.arg):
+            defined.add(node.arg)
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            defined.add(node.name)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id not in defined:
+                problems.append(f"calls undefined function '{node.func.id}'")
+        elif isinstance(node, ast.While):
+            literal_true = isinstance(node.test, ast.Constant) and node.test.value is True
+            has_exit = any(isinstance(n, (ast.Break, ast.Return, ast.Raise))
+                           for n in ast.walk(node))
+            if literal_true and not has_exit:
+                problems.append("has a 'while True' loop with no break")
+            elif not has_exit and not literal_true:
+                # A conditional loop with no escape hatch is how the K-Means
+                # sample hung; the prompt asks for a step cap, so require one.
+                problems.append("has a while loop with no break or step cap")
+
+    return sorted(set(problems))
+
+
+def _extract_code(text):
+    """
+    Pull the program out of a model response.
+
+    Returns (code, remaining_text). Models vary the fence (```python, ```Python,
+    ```py, ``` python, CRLF, or bare ```) and the walkthrough sometimes quotes a
+    line or two in its own fence, so take the LONGEST block rather than the first
+    - the first was yielding 69-character fragments. The block must also parse as
+    Python, otherwise it is not something a learner can run.
+    """
+    # Models sometimes double the fence ("```python" twice, then "```" twice).
+    # Left as-is the regex pairs the two openers and captures nothing, so
+    # collapse any run of consecutive fence-only lines down to one.
+    # Only *identical* neighbours collapse: "```" followed by "```python" is a
+    # real close-then-open pair and must be left alone.
+    text = re.sub(r"(?m)^(```[ \t]*[a-zA-Z]*)[ \t]*$(?:\r?\n^\1[ \t]*$)+", r"\1", text)
+
+    blocks = list(re.finditer(r"```[ \t]*(?:python|py)?[ \t]*\r?\n(.*?)```",
+                              text, re.DOTALL | re.IGNORECASE))
+    if not blocks:
+        return "", text
+
+    for match in sorted(blocks, key=lambda m: len(m.group(1)), reverse=True):
+        code = match.group(1).strip()
+        if len(code) < 80:
+            continue
+        try:
+            ast.parse(code)
+        except SyntaxError as e:
+            logger.warning(f"Discarding code block that does not parse: {e}")
+            continue
+        rest = text.replace(match.group(0), "")
+        # Any remaining fence belongs to a snippet the walkthrough quoted; keep
+        # the quoted lines but drop the ``` markers so they don't render raw.
+        rest = re.sub(r"^```[ \t]*[a-zA-Z]*[ \t]*$", "", rest, flags=re.MULTILINE)
+        return code, rest.strip()
+
+    return "", text
+
 
 def call_genai(api_key, topic, length, mode, previous_attempts=None):
     """
@@ -42,7 +195,7 @@ Teaching Guidelines:
 - Use appropriate technical depth for the topic
 - Include practical applications when relevant
 - Ensure accuracy and clarity
-- Format output as clean text WITHOUT markdown symbols like #, *, **, etc.
+- Format output as clean text WITHOUT markdown symbols like #, *, **, etc. The ONLY exception is the ```python code fence, which is REQUIRED whenever code is requested.
 - Use plain text formatting with clear paragraphs and line breaks
 - For headings, put the heading on its own line in Title Case, followed by a blank line. Never use # symbols.
 - For emphasis, use "quotation marks" instead of * or **
@@ -56,11 +209,32 @@ Teaching Guidelines:
     
     if mode == "Code with explanation":
         code_instruction = f"""
-- You MUST also generate a Python program that demonstrates how {topic} works.
-- Before the Python code block, provide a detailed but beginner-friendly explanation in markdown. This explanation should cover the model, key functions, and evaluation.
-- The Python code itself should be enclosed in a single '```python' and '```' block.
+- You MUST generate a Python program that demonstrates how {topic} works.
+- The Python code itself must be enclosed in a single '```python' and '```' block.
+- The program must be complete, runnable end-to-end without edits, and print its results.
 - Include helpful comments in the code explaining key steps.
-- Show expected outputs or results where applicable.
+- Re-read the code before finalizing and fix logic errors (for example a reward or update computed on the wrong state, or off-by-one indexing).
+- EVERY loop MUST be guaranteed to terminate. A 'while' loop that waits for a goal or for convergence MUST also have a hard step counter that breaks out (for example 'for step in range(100):' or 'if steps > 100: break'). The program must finish in a few seconds.
+- Keep the workload small so it runs quickly: at most a few hundred iterations or episodes, and a small dataset.
+
+- AFTER the code block, write a walkthrough using EXACTLY these five headings, each on its own line:
+
+What This Program Does
+Two or three sentences on the goal of the program and what it prints.
+
+Packages And Imports
+One bullet per imported package, in the form "numpy - what it is, and what it is used for HERE in this program". Name the specific functions used from each package.
+
+Step By Step Walkthrough
+Walk through the code in order, section by section. For each section, first quote the actual line or the few lines being explained exactly as they appear in the code, then explain on the next line what they do and why. Write those quoted lines as plain text - do NOT wrap them in backticks or in another code fence. Cover every meaningful section: setup and hyperparameters, data or environment creation, the main loop, the core update or fit step, and the output. Do not skip the central algorithm step.
+
+Key Functions Explained
+One entry per function defined or called that matters. Give its name, its parameters, what it returns, and why it is needed.
+
+Things To Try
+Two or three concrete edits the learner can make (change a value, print something extra) and what they should expect to see change.
+
+- Use plain text under each heading. Bullets may start with "- ". Do not use markdown symbols like #, * or **.
 """
     
     elif mode == "Audio":
@@ -84,9 +258,9 @@ Teaching Guidelines:
   * Create prompts for technical diagrams, educational visualizations, and concept illustrations related to {topic}.
   * Focus on clear, educational visual content: diagrams, flowcharts, architectural representations.
   * Use descriptive language for technical accuracy: "neural network architecture diagram", "decision tree visualization", "clustering algorithm illustration".
-  * Include style guidance: "technical diagram style", "educational infographic", "clean minimalist design".
-  * Specify backgrounds: "white background", "clean background", "professional presentation style".
-  * All text in generated images MUST be in English.
+  * Describe SHAPES, ARROWS and LAYOUT rather than words, because the image model cannot render readable text. Never ask for labels, captions or titles inside the image.
+  * Do NOT mention the background or the colour scheme at all - those are added automatically afterwards.
+  * Keep each prompt under 40 words.
 """
     
     # Combine all instructions
@@ -97,7 +271,7 @@ Teaching Guidelines:
 Output Requirements:
 - Write in normal sentence case. Do NOT write sentences, paragraphs, code comments or headings in all capitals.
 - Provide clear, well-structured content
-- DO NOT use any markdown formatting symbols (#, *, **, _, etc.)
+- DO NOT use any markdown formatting symbols (#, *, **, _, etc.), EXCEPT the ```python ... ``` fence around code, which is mandatory when code was requested
 - Use plain text with clear paragraph breaks for readability
 - Do not add conversational elements like "I hope this helps"
 - Focus on educational value and accuracy
@@ -107,77 +281,59 @@ Output Requirements:
 
     # Mode markers go last: earlier in the prompt the formatting rules above
     # outrank them and the model drops the marker entirely.
-    if mode == "Image Explanation":
+    if mode == "Code with explanation":
+        prompt += """
+FINAL REQUIREMENT (do not skip):
+Your response MUST contain a Python code block that starts with a line of exactly ```python and ends with a line of exactly ```. Write the code block FIRST, then the five walkthrough sections after it. Without the ```python fence the response is unusable.
+"""
+    elif mode == "Image Explanation":
         prompt += """
 FINAL REQUIREMENT (do not skip):
 After the written explanation, output 2-3 image prompts. Each one must start on its own line with the literal marker IMG-PROMPT:: written exactly like that. The marker is mandatory.
 """
     
-    payload = {
-        "model": NIM_TEXT_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
-        "top_p": 0.95,
-        "max_tokens": 4096,
-        # Nemotron is a reasoning model and otherwise streams its scratchpad into
-        # `content`; learners only want the answer.
-        "chat_template_kwargs": {"thinking": False},
-    }
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-    }
+    # The code walkthrough is long; a 4096 budget left muse-glimmer finishing
+    # on 'length' with zero content.
+    max_tokens = 7000 if mode == "Code with explanation" else 4096
 
-    max_retries = 3
-    attempt = 0
+    models = NIM_MODELS.get(mode, DEFAULT_MODELS)
+    for model in models:
+        full_response_text = _chat(api_key, [{"role": "user", "content": prompt}], model,
+                                   max_tokens=max_tokens)
+        if not full_response_text:
+            logger.warning(f"{model} returned nothing for mode '{mode}'; trying next model")
+            continue
 
-    while attempt < max_retries:
-        try:
-            response = requests.post(NIM_CHAT_URL, headers=headers, json=payload, timeout=180)
+        briefing, code_content, audio_script, image_prompts = full_response_text, "", "", []
 
-            if response.status_code == 429:
-                logger.warning(f"Rate limit hit. Waiting 60 seconds before retrying... ({attempt + 1}/{max_retries})")
-                time.sleep(60)
-                attempt += 1
+        if mode == "Code with explanation":
+            code_content, briefing = _extract_code(briefing)
+            if not code_content:
+                logger.warning(f"{model} returned no usable code block; trying next model")
                 continue
+            smells = _code_smells(code_content)
+            if smells and model != models[-1]:
+                # A learner cannot debug this; another model usually can do better.
+                logger.warning(f"{model} code has problems ({'; '.join(smells)}); trying next model")
+                continue
+            if smells:
+                logger.warning(f"Shipping code from {model} despite: {'; '.join(smells)}")
 
-            response.raise_for_status()
-            full_response_text = response.json()["choices"][0]["message"]["content"]
+        elif mode == "Audio":
+            # Asking for explanation + marker + script was unreliable: the model
+            # merged the parts and dropped the marker. The response is the script.
+            audio_script = briefing
 
-            # Nemotron can emit a <think> reasoning block; it is not learner-facing content.
-            full_response_text = re.sub(r"<think>.*?</think>", "", full_response_text, flags=re.DOTALL).strip()
+        elif mode == "Image Explanation":
+            marker = "IMG-PROMPT::"
+            if marker not in briefing:
+                logger.warning(f"{model} returned no IMG-PROMPT:: lines; trying next model")
+                continue
+            first_marker_pos = briefing.find(marker)
+            image_prompts = [p.strip() for p in briefing[first_marker_pos:].split(marker) if p.strip()]
+            briefing = briefing[:first_marker_pos].strip()
 
-            # Initialize return values
-            briefing, code_content, audio_script, image_prompts = full_response_text, "", "", []
+        return briefing, code_content, audio_script, image_prompts
 
-            # Parse different modes
-            if mode == "Code with explanation":
-                code_match = re.search(r"```python\n(.*?)```", briefing, re.DOTALL)
-                if code_match:
-                    code_content = code_match.group(1).strip()
-                    # Remove code block from briefing
-                    briefing = briefing.replace(code_match.group(0), "").strip()
-
-            elif mode == "Audio":
-                # Asking for explanation + marker + script was unreliable: the model
-                # merged the parts and dropped the marker. The response is the script.
-                audio_script = briefing
-
-            elif mode == "Image Explanation":
-                marker = "IMG-PROMPT::"
-                if marker in briefing:
-                    first_marker_pos = briefing.find(marker)
-                    briefing_text = briefing[:first_marker_pos].strip()
-                    prompts_text = briefing[first_marker_pos:]
-                    image_prompts = [p.strip() for p in prompts_text.split(marker) if p.strip()]
-                    briefing = briefing_text
-
-            return briefing, code_content, audio_script, image_prompts
-
-        except Exception as e:
-            logger.error(f"An unexpected error occurred during the NVIDIA NIM API call: {e}")
-            return None
-
-    logger.error("API call failed after multiple retries due to rate limiting.")
+    logger.error(f"All models failed for mode '{mode}'")
     return None

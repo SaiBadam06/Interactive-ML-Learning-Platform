@@ -8,7 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyScriptBtn = document.getElementById('copyScriptBtn');
     
     let currentScript = '';
-    let currentAudioFile = '';
+    let currentAudioFile = null;
+    let currentAudioData = null;
     
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -52,9 +53,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Display audio player
                 if (data.audio_file) {
                     currentAudioFile = data.audio_file;
+                    currentAudioData = data.audio_data || null;
                     audioPlayer.innerHTML = `
                         <audio controls>
-                            <source src="/api/download-audio/${data.audio_file}" type="audio/mpeg">
+                            <source src="${data.audio_data || ('/api/download-audio/' + data.audio_file)}" type="audio/mpeg">
                             Your browser does not support the audio element.
                         </audio>
                     `;
@@ -80,7 +82,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Download audio button
     downloadAudioBtn.addEventListener('click', () => {
         if (currentAudioFile) {
-            window.location.href = `/api/download-audio/${currentAudioFile}`;
+            if (currentAudioData) {
+                const a = document.createElement('a');
+                a.href = currentAudioData;
+                a.download = currentAudioFile || 'explanation.mp3';
+                document.body.appendChild(a); a.click(); a.remove();
+            } else {
+                window.location.href = `/api/download-audio/${currentAudioFile}`;
+            }
             showToast('Downloading audio file...', 'info');
         }
     });
