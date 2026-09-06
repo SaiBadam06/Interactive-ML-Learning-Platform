@@ -7,10 +7,13 @@
     }
   ],
   "functions": {
+    "app.py": {
+      "maxDuration": 300,
+      "memory": 1024
+    },
     "api/index.py": {
       "maxDuration": 300,
-      "memory": 1024,
-      "includeFiles": "{app.py,utils/**,templates/**,static/**}"
+      "memory": 1024
     }
   }
 }

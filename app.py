@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import secrets
 import base64
+import tempfile
 
 # Import utility modules
 from utils.genai_utils import call_genai, call_followup, explain_code_sections
@@ -28,9 +29,42 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(16))
 
+_SUBDIRS = ('uploads', 'generated_audio', 'generated_code')
+
+
+def _resolve_data_dir():
+    """
+    Pick a directory the app can actually write to, and create the subfolders.
+
+    Serverless filesystems are read-only apart from /tmp. Vercel imports this
+    module directly as the function entrypoint, so this has to hold on its own
+    rather than relying on a wrapper to set DATA_DIR first - getting that wrong
+    crashed every request with
+    "OSError: [Errno 30] Read-only file system: './uploads'".
+    """
+    candidates = [
+        os.getenv('DATA_DIR'),
+        # Set by Vercel and AWS Lambda respectively.
+        '/tmp' if (os.getenv('VERCEL') or os.getenv('AWS_LAMBDA_FUNCTION_NAME')) else None,
+        '.',
+        tempfile.gettempdir(),
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            for sub in _SUBDIRS:
+                os.makedirs(os.path.join(candidate, sub), exist_ok=True)
+            return candidate
+        except OSError as e:
+            logger.warning(f"Cannot use {candidate!r} for generated files: {e}")
+    # Nothing was writable. Downloads will fail, but the app still serves pages.
+    logger.error("No writable data directory found; file downloads will not work")
+    return tempfile.gettempdir()
+
+
 # Configuration
-# DATA_DIR: where generated files go. Serverless hosts (Vercel) only allow /tmp.
-DATA_DIR = os.getenv('DATA_DIR', '.')
+DATA_DIR = _resolve_data_dir()
 UPLOAD_FOLDER = os.path.join(DATA_DIR, 'uploads')
 AUDIO_DIR = os.path.join(DATA_DIR, 'generated_audio')
 CODE_DIR = os.path.join(DATA_DIR, 'generated_code')
@@ -38,10 +72,7 @@ ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg'}
 VALID_LENGTHS = {'Brief', 'Detailed', 'Comprehensive'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
-# Create necessary directories
-for _d in (UPLOAD_FOLDER, AUDIO_DIR, CODE_DIR):
-    os.makedirs(_d, exist_ok=True)
+os.environ['DATA_DIR'] = DATA_DIR  # utils/ read this to place their output
 
 
 def read_request():
