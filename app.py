@@ -13,7 +13,12 @@ from utils.code_executor import detect_dependencies, save_code_to_file
 from utils.image_utils import generate_images, get_model_info
 
 # Load environment variables
-load_dotenv()
+# Explicit path: bare load_dotenv() walks the call stack to locate the file,
+# which can raise under an unusual import stack. On Vercel there is no .env at
+# all (it is in .vercelignore); the platform supplies the environment.
+_ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+if os.path.exists(_ENV_FILE):
+    load_dotenv(_ENV_FILE)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
