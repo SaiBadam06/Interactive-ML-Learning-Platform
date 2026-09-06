@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Practice - ML Learning Assistant{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-circle-question"></i> Practice</h1>
+        <p>Quiz yourself, or your students, on any topic without generating an explanation first</p>
+    </div>
+
+    <div class="content-wrapper">
+        <!-- Input Section -->
+        <div class="input-section card">
+            <h2>What would you like to be quizzed on?</h2>
+
+            <div class="recent-topics" id="recentTopics" hidden></div>
+
+            <form id="practiceForm">
+                <div class="form-group">
+                    <label for="topic">
+                        <i class="fas fa-lightbulb"></i> Machine Learning Topic
+                    </label>
+                    <input
+                        type="text"
+                        id="topic"
+                        name="topic"
+                        class="form-control"
+                        placeholder="e.g., Q-learning, gradient descent, bias-variance tradeoff"
+                        required
+                    >
+                    <small class="form-hint">Three to six multiple-choice questions, checked as you answer</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="level">
+                            <i class="fas fa-user-graduate"></i> Explain for
+                        </label>
+                        <select id="level" name="level" class="form-control">
+                            <option value="Beginner" selected>Beginner</option>
+                            <option value="Intermediate">Intermediate</option>
+                            <option value="Advanced">Advanced</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" id="quizGenerateBtn" class="btn btn-primary btn-large">
+                    <i class="fas fa-wand-magic-sparkles"></i> Generate quiz
+                </button>
+            </form>
+        </div>
+
+        <!-- Quiz -->
+        <div class="card quiz-card" id="quizCard" data-context-ids="">
+            <div class="output-header">
+                <h2><i class="fas fa-list-check"></i> Your questions</h2>
+            </div>
+            <p class="section-hint">Pick an answer to see whether it is right and why.</p>
+            <div id="quizContent" class="quiz-content"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

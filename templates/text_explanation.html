@@ -14,6 +14,8 @@
         <div class="input-section card">
             <h2>What would you like to learn?</h2>
             
+            <div class="recent-topics" id="recentTopics" hidden></div>
+
             <form id="textForm">
                 <div class="form-group">
                     <label for="topic">
@@ -30,15 +32,27 @@
                     <small class="form-hint">Enter any ML concept, algorithm, or technique you want to understand</small>
                 </div>
 
-                <div class="form-group">
-                    <label for="length">
-                        <i class="fas fa-sliders-h"></i> Explanation Depth
-                    </label>
-                    <select id="length" name="length" class="form-control">
-                        <option value="Brief">Brief - Quick overview (2-3 paragraphs)</option>
-                        <option value="Detailed" selected>Detailed - In-depth explanation (5-7 paragraphs)</option>
-                        <option value="Comprehensive">Comprehensive - Complete guide (10+ paragraphs)</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="length">
+                            <i class="fas fa-sliders-h"></i> Explanation Depth
+                        </label>
+                        <select id="length" name="length" class="form-control">
+                            <option value="Brief">Brief - Quick overview (2-3 paragraphs)</option>
+                            <option value="Detailed" selected>Detailed - In-depth explanation (5-7 paragraphs)</option>
+                            <option value="Comprehensive">Comprehensive - Complete guide (10+ paragraphs)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="level">
+                            <i class="fas fa-user-graduate"></i> Explain for
+                        </label>
+                        <select id="level" name="level" class="form-control">
+                            <option value="Beginner" selected>Beginner</option>
+                            <option value="Intermediate">Intermediate</option>
+                            <option value="Advanced">Advanced</option>
+                        </select>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-large">
@@ -58,11 +72,30 @@
                     <button id="downloadBtn" class="btn btn-secondary">
                         <i class="fas fa-download"></i> Download
                     </button>
+                    <button id="downloadLessonBtn" class="btn btn-secondary">
+                        <i class="fas fa-file-arrow-down"></i> Download lesson (.md)
+                    </button>
                 </div>
             </div>
             
+            <div class="continue-row" id="continueRow" data-current="text" hidden></div>
+
             <div id="explanation" class="explanation-content"></div>
         
+            <!-- Check your understanding -->
+            <div class="card quiz-card" id="quizCard" data-context-ids="explanation">
+                <div class="output-header">
+                    <h2><i class="fas fa-circle-question"></i> Check your understanding</h2>
+                    <div class="output-actions">
+                        <button id="quizGenerateBtn" class="btn btn-secondary">
+                            <i class="fas fa-wand-magic-sparkles"></i> Generate quiz
+                        </button>
+                    </div>
+                </div>
+                <p class="section-hint">A few questions on what you just read. Answers are checked as you go.</p>
+                <div id="quizContent" class="quiz-content"></div>
+            </div>
+
             <!-- Ask a follow-up -->
             <div class="card follow-up-card">
                 <div class="follow-up" id="followUp">

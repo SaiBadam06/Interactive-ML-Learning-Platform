@@ -12,12 +12,61 @@
         <p class="hero-subtitle">
             Master Machine Learning with AI-powered explanations, code examples, audio lessons, and visual diagrams!
         </p>
+        <div class="quick-start" id="quickStart">
+            <label class="sr-only" for="quickTopic">Machine Learning Topic</label>
+            <input type="text" id="quickTopic" class="form-control"
+                   placeholder="What do you want to learn? e.g. Q-Learning">
+            <div class="quick-start-buttons">
+                <button type="button" class="btn btn-primary" data-path="/text-explanation">
+                    <i class="fas fa-book"></i> Explain
+                </button>
+                <button type="button" class="btn btn-primary" data-path="/code-generation">
+                    <i class="fas fa-code"></i> Code
+                </button>
+                <button type="button" class="btn btn-primary" data-path="/audio-learning">
+                    <i class="fas fa-headphones"></i> Audio
+                </button>
+                <button type="button" class="btn btn-primary" data-path="/image-visualization">
+                    <i class="fas fa-image"></i> Images
+                </button>
+            </div>
+        </div>
+
         <div class="hero-features">
             <span class="hero-badge"><i class="fas fa-robot"></i> Powered by NVIDIA NIM</span>
             <span class="hero-badge"><i class="fas fa-paint-brush"></i> FLUX.1-dev</span>
             <span class="hero-badge"><i class="fas fa-rocket"></i> Interactive Learning</span>
         </div>
     </div>
+</div>
+
+<div class="container">
+    <div class="recent-topics" id="recentTopics" data-target="/text-explanation" hidden></div>
+
+    <section class="suggested-section">
+        <h2 class="section-title">Suggested Topics</h2>
+        {% for group, topics in [
+            ('Reinforcement Learning', ['Q-Learning', 'SARSA', 'Deep Q-Network', 'Policy Gradient',
+                                        'Bellman Equation', 'Markov Decision Process',
+                                        'Epsilon-Greedy Exploration']),
+            ('Supervised Learning', ['Linear Regression', 'Logistic Regression', 'Decision Trees',
+                                     'Random Forest', 'Support Vector Machines',
+                                     'K-Nearest Neighbors']),
+            ('Unsupervised Learning', ['K-Means Clustering', 'PCA']),
+            ('Neural Networks', ['Gradient Descent', 'Backpropagation',
+                                 'Convolutional Neural Networks'])
+        ] %}
+        <div class="suggested-group">
+            <h3>{{ group }}</h3>
+            <div class="topic-chips">
+                {% for topic in topics %}
+                <a class="topic-chip"
+                   href="{{ url_for('text_explanation') }}?topic={{ topic | urlencode }}">{{ topic }}</a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </section>
 </div>
 
 <div class="container">

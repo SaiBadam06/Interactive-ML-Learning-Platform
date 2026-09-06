@@ -21,6 +21,33 @@ DEFAULT_MODELS = [NIM_TEXT_MODEL, NIM_CODE_MODEL]
 NIM_MODELS = {}
 
 
+# What "explain it for me" means at each level. The same topic needs a different
+# explanation for a first-year student and for someone teaching it.
+AUDIENCE = {
+    "Beginner": (
+        "Audience: a complete beginner.\n"
+        "- Open with an everyday analogy before any technical detail.\n"
+        # "Define every term" on its own produced a bolded glossary ("- **Algorithm**: ...")
+        # and broke the no-markdown rule, so say where the definition goes.
+        "- Explain every technical term in plain words the first time it appears, inside the "
+        "sentence itself. Do not write a glossary and do not bold the term.\n"
+        "- Avoid equations unless one is essential; when you use one, explain every symbol in words.\n"
+    ),
+    "Intermediate": (
+        "Audience: someone who already has basic machine learning vocabulary.\n"
+        "- Assume terms like feature, label, loss and gradient are understood.\n"
+        "- Include the key equation and explain what each symbol stands for.\n"
+        "- Include one worked example with concrete numbers.\n"
+    ),
+    "Advanced": (
+        "Audience: an advanced practitioner.\n"
+        "- Be mathematically precise and state the assumptions the method relies on.\n"
+        "- Cover failure modes and computational complexity.\n"
+        "- Relate the method to neighbouring methods and say when each is preferable.\n"
+    ),
+}
+
+
 def _chat(api_key, messages, model, max_tokens=4096, temperature=0.7):
     """One NIM chat call. Returns the content string, or None on failure."""
     headers = {
@@ -54,10 +81,11 @@ def _chat(api_key, messages, model, max_tokens=4096, temperature=0.7):
     return None
 
 
-def call_followup(api_key, topic, context, history, question):
+def call_followup(api_key, topic, context, history, question, level="Beginner"):
     """Answer a follow-up question about material the learner was just shown."""
     system = (
         f"You are a patient tutor. The learner is studying: {topic or 'a computer science topic'}.\n"
+        f"{AUDIENCE.get(level, AUDIENCE['Beginner'])}\n"
         "Here is the material they were shown:\n\n"
         f"{context[:6000]}\n\n"
         "Answer follow-up questions about this material concretely and briefly. "
@@ -156,6 +184,99 @@ def explain_code_sections(api_key, code, topic=None):
     return []
 
 
+def generate_quiz(api_key, topic, context="", level="Beginner"):
+    """
+    Multiple-choice questions plus key terms for material the learner just read.
+
+    Same contract as explain_code_sections: ask for ONE JSON object, pull it out
+    with a regex, validate every field, and drop anything malformed. A quiz whose
+    answer key is wrong is worse than no quiz, so a question survives only with
+    exactly four options and an answer index that actually points at one of them.
+
+    Returns {"questions": [...], "key_terms": [...]}; both lists empty on failure,
+    which the page treats as "the quiz could not be generated".
+    """
+    prompt = (
+        f"Write a short self-check quiz on: {topic}\n"
+        f"The learner is at {level} level; pitch the questions there.\n"
+    )
+    if context:
+        prompt += (
+            "\nThey have just read this material, so base the questions on it and, where "
+            "code appears, ask what a specific line or parameter does:\n\n"
+            f"{context[:6000]}\n"
+        )
+    prompt += (
+        "\nReply with ONLY a JSON object, no prose before or after it:\n"
+        '{"questions": [{"question": "...", "options": ["a", "b", "c", "d"], '
+        '"answer": <index 0-3 of the correct option>, "explanation": "why that answer is '
+        'right, 1-2 sentences"}], '
+        '"key_terms": [{"term": "...", "definition": "one sentence"}]}\n\n'
+        "Rules: 3 to 6 questions; exactly four options each; mix conceptual questions with "
+        "concrete ones; up to 8 key terms; plain sentence case with no markdown."
+    )
+
+    # The code model first: quizzes are short and it answers in a few seconds.
+    for model in (NIM_CODE_MODEL, NIM_TEXT_MODEL):
+        raw = _chat(api_key, [{"role": "user", "content": prompt}], model, max_tokens=2500)
+        if not raw:
+            continue
+
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not match:
+            logger.warning(f"{model} returned no JSON object for the quiz")
+            continue
+        try:
+            parsed = json.loads(match.group(0))
+        except json.JSONDecodeError as e:
+            logger.warning(f"{model} returned unparseable quiz JSON: {e}")
+            continue
+        if not isinstance(parsed, dict):
+            continue
+
+        questions = []
+        for item in parsed.get("questions") or []:
+            if not isinstance(item, dict):
+                continue
+            options = item.get("options")
+            if not isinstance(options, list) or len(options) != 4:
+                continue
+            options = [str(o).strip() for o in options]
+            if not all(options):
+                continue
+            # bool is an int subclass and would sneak through as index 0/1.
+            answer = item.get("answer")
+            if isinstance(answer, bool) or not isinstance(answer, int) or not 0 <= answer <= 3:
+                continue
+            question = str(item.get("question") or "").strip()
+            explanation = str(item.get("explanation") or "").strip()
+            if not question or not explanation:
+                continue
+            questions.append({"question": question, "options": options,
+                              "answer": answer, "explanation": explanation})
+            if len(questions) == 6:
+                break
+
+        if not questions:
+            logger.warning(f"{model} produced no usable quiz questions; trying next model")
+            continue
+
+        key_terms = []
+        for item in parsed.get("key_terms") or []:
+            if not isinstance(item, dict):
+                continue
+            term = str(item.get("term") or "").strip()[:60]
+            definition = str(item.get("definition") or "").strip()
+            if term and definition:
+                key_terms.append({"term": term, "definition": definition})
+            if len(key_terms) == 8:
+                break
+
+        return {"questions": questions, "key_terms": key_terms}
+
+    return {"questions": [], "key_terms": []}
+
+
 def _code_smells(code):
     """
     Static checks for the two ways generated programs actually broke in testing:
@@ -244,20 +365,40 @@ def _extract_code(text):
     return "", text
 
 
-def call_genai(api_key, topic, length, mode, previous_attempts=None):
+def _strip_markdown(text):
+    """
+    Remove the two markdown constructs the models still emit despite being told
+    not to, so the page never shows raw "**" or "###" to a learner.
+
+    The prompt forbids markdown and mostly that holds, but asking for every term
+    to be defined reliably produces a bolded glossary ("- **Algorithm**: ...").
+    Instructions did not fix it; deleting the markers does.
+
+    Only markers that sit at a word boundary and wrap non-space text on one line
+    are unwrapped, so a Python exponent quoted in a walkthrough survives whether
+    it is written "2 ** 3" or "x**2 and y**3". Only headings of two or more
+    hashes are stripped, because a single "# " is a code comment.
+    """
+    text = re.sub(r"(?<![\w*])\*\*(\S(?:[^*\n]*\S)?)\*\*(?![\w*])", r"\1", text)
+    return re.sub(r"(?m)^#{2,6}[ \t]+", "", text)
+
+
+def call_genai(api_key, topic, length, mode, previous_attempts=None, level="Beginner"):
     """
     Call NVIDIA NIM to generate ML learning content
-    
+
     Args:
         api_key: NVIDIA NIM API key (nvapi-...)
         topic: ML topic to explain
         length: Length of explanation (Brief, Detailed, Comprehensive)
         mode: Output mode (Text explanation, Code with explanation, Audio, Image Explanation)
         previous_attempts: Previous attempts (for retry logic)
-    
+        level: Who it is for (Beginner, Intermediate, Advanced) - see AUDIENCE
+
     Returns:
         Tuple of (briefing, code_content, audio_script, image_prompts)
     """
+    audience = AUDIENCE.get(level, AUDIENCE["Beginner"])
     # Enhanced prompt construction
     base_prompt = f"""
 You are an expert educational tutor providing content for topics related to Computer Science, Software Development, Technology, Artificial Intelligence (AI), Machine Learning (ML), and Deep Learning (DL).
@@ -271,6 +412,7 @@ Topic: "{topic}"
 Required format: {mode}
 Explanation depth: {length}
 
+{audience}
 Teaching Guidelines:
 - Start with a clear learning objective
 - Provide structured explanations with examples
@@ -415,7 +557,8 @@ After the written explanation, output 2-3 image prompts. Each one must start on 
             image_prompts = [p.strip() for p in briefing[first_marker_pos:].split(marker) if p.strip()]
             briefing = briefing[:first_marker_pos].strip()
 
-        return briefing, code_content, audio_script, image_prompts
+        # Prose only: code_content is already out of `briefing` by this point.
+        return _strip_markdown(briefing), code_content, _strip_markdown(audio_script), image_prompts
 
     logger.error(f"All models failed for mode '{mode}'")
     return None

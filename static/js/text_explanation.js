@@ -12,13 +12,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const topic = document.getElementById('topic').value.trim();
         const length = document.getElementById('length').value;
+        const level = document.getElementById('level').value;
 
         if (!topic) {
             showToast('Please enter a topic', 'error');
             return;
         }
         try {
-            showLoading(true);
+            showLoading(true, 'Writing your explanation - usually 15-40 s');
             const response = await fetch('/api/generate-text', {
                 method: 'POST',
                 headers: {
@@ -26,7 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     topic,
-                    length
+                    length,
+                    level
                 })
             });
             const data = await response.json();
@@ -38,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 explanationDiv.innerHTML = formatMarkdown(data.content);
                 outputSection.style.display = 'block';
                 outputSection.scrollIntoView({ behavior: 'smooth' });
+                rememberTopic(topic);
                 showToast('Explanation generated successfully!', 'success');
             } else {
                 throw new Error('Failed to generate content');

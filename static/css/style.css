@@ -1531,3 +1531,337 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     .code-section-lines { margin-left: 0; width: 100%; }
     .code-section-code { font-size: .78rem; }
 }
+
+/* ===== Run the code in the browser ===== */
+/* The horizontal scroller is this wrapper, not the <pre>, so the gutter can be
+   pinned with position:sticky and stay visible while the code scrolls. */
+.code-with-gutter {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+}
+
+/* font-size and line-height are pinned here as well as on the code element:
+   without them the <pre>'s own 1rem strut makes each line taller than the
+   gutter's 0.9rem lines and the numbers drift out of alignment. */
+.code-with-gutter pre {
+    margin: 0;
+    padding: 20px 20px 20px 12px;
+    overflow: visible;
+    flex: 1 0 auto;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.code-gutter {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    flex: none;
+    padding: 20px 10px 20px 14px;
+    background-color: #1e1e1e;
+    border-right: 1px solid #333;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    text-align: right;
+    user-select: none;
+}
+
+.code-gutter button {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    color: #6b7280;
+    font: inherit;
+    line-height: 1.5;
+    text-align: right;
+    cursor: pointer;
+}
+
+.code-gutter button:hover { color: #a5b4fc; }
+
+.code-gutter-hint { margin: .5rem 0 0; }
+
+.code-editor {
+    display: block;
+    width: 100%;
+    min-height: 200px;
+    padding: 20px;
+    border: none;
+    resize: vertical;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    tab-size: 4;
+}
+
+.run-output {
+    margin-top: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.run-status {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .55rem .9rem;
+    background-color: var(--bg-tertiary);
+    font-size: .875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.run-status-ok { color: var(--secondary-color); }
+.run-status-error { color: var(--danger-color); }
+
+.run-status-busy::before {
+    content: '';
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border: 2px solid rgba(79, 70, 229, .3);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.run-text {
+    margin: 0;
+    padding: .9rem;
+    max-height: 40vh;
+    overflow: auto;
+    background-color: #111827;
+    color: #e5e7eb;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: .85rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.run-text:empty { display: none; }
+.run-err { color: #fca5a5; }
+
+.run-figures { display: flex; flex-direction: column; gap: .75rem; }
+.run-figures:not(:empty) { padding: .9rem; background-color: #fff; }
+.run-figures img { max-width: 100%; height: auto; border-radius: 6px; }
+
+/* ===== Check your understanding (quiz) ===== */
+.quiz-content:empty { display: none; }
+
+.quiz-terms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-bottom: 1.25rem;
+}
+
+/* Rounded rectangles, not pills: 5px on chips, 6px on options, 10px on the
+   question container. Nothing containing text gets a 999px radius. */
+.quiz-term {
+    padding: .4rem .8rem;
+    border: 1px solid #c7d2fe;
+    border-radius: 5px;
+    background-color: #eef2ff;
+    color: #3730a3;
+    font: inherit;
+    font-size: .85rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.quiz-term-def { display: block; margin-top: .35rem; color: var(--text-primary); }
+
+.quiz-q {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background-color: var(--bg-primary);
+}
+
+.quiz-q-text { font-weight: 600; margin-bottom: .6rem; }
+
+.quiz-options { display: flex; flex-direction: column; gap: .5rem; }
+
+.quiz-option {
+    width: 100%;
+    min-height: 44px;
+    padding: .6rem .9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.quiz-option:hover:not(:disabled) { border-color: var(--primary-color); }
+.quiz-option:disabled { cursor: default; opacity: 1; }
+.quiz-option.correct { border-color: var(--secondary-color); background-color: #ecfdf5; font-weight: 600; }
+.quiz-option.incorrect { border-color: var(--danger-color); background-color: #fef2f2; }
+
+.quiz-explanation {
+    margin: .6rem 0 0;
+    padding: .6rem .9rem;
+    border-left: 3px solid var(--primary-color);
+    border-radius: 0 6px 6px 0;
+    background-color: var(--bg-secondary);
+    line-height: 1.6;
+}
+
+.quiz-score { font-weight: 700; margin: 0 0 .75rem; }
+.quiz-score:empty { display: none; }
+
+/* Two controls side by side on desktop, stacked on a phone. */
+.form-row { display: flex; flex-wrap: wrap; gap: 20px; }
+.form-row .form-group { flex: 1 1 220px; margin-bottom: 20px; }
+
+.code-section-ask {
+    margin-top: .75rem;
+    padding: .45rem .8rem;
+    font-size: .85rem;
+}
+
+/* ===== Quick start, recent and suggested topics ===== */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0);
+    white-space: nowrap; border: 0;
+}
+
+.quick-start {
+    max-width: 640px;
+    margin: 0 auto 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.quick-start input { font-size: 16px; }
+
+.quick-start-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.quick-start-buttons .btn { flex: 1 1 120px; justify-content: center; }
+
+.recent-topics,
+.continue-row,
+.topic-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+}
+
+.recent-topics { margin-bottom: 1.25rem; }
+.continue-row { margin-bottom: 1.25rem; }
+
+.chips-label { color: var(--text-secondary); font-size: .875rem; }
+
+/* Rounded rectangle, not a pill - see the quiz chips. */
+.topic-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .35rem .7rem;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background-color: var(--bg-primary);
+    color: var(--primary-dark);
+    font-size: .85rem;
+    text-decoration: none;
+}
+
+.topic-chip:hover { border-color: var(--primary-color); background-color: var(--bg-tertiary); }
+
+.suggested-section { margin-bottom: 40px; }
+.suggested-group { margin-bottom: 1.25rem; }
+.suggested-group h3 { font-size: 1rem; margin-bottom: .5rem; color: var(--text-secondary); }
+
+.loading-elapsed { color: rgba(255, 255, 255, .75); font-size: 1rem; }
+
+/* ===== Mobile (F8) =====
+   Audited at 390x844 and 768x1024. The rules are grouped here rather than
+   scattered through the file so the phone layout can be read in one place. */
+@media (max-width: 768px) {
+    /* Anything that looks like a button must be a comfortable tap target. */
+    .btn, .quiz-option, .quiz-term, .tab-btn { min-height: 44px; }
+
+    .output-actions { width: 100%; }
+    .output-actions .btn { flex: 1 1 auto; justify-content: center; }
+
+    /* Line numbers double as tap targets, so the code lines grow to match -
+       the gutter and the code must keep exactly the same line height or the
+       numbers drift away from their lines. */
+    .code-container pre,
+    .code-container code,
+    .code-with-gutter pre,
+    .code-gutter,
+    .code-gutter button {
+        font-size: .8rem;
+        line-height: 32px;
+    }
+
+    .code-editor { font-size: .8rem; line-height: 32px; }
+
+    audio { width: 100%; }
+}
+
+@media (max-width: 640px) {
+    /* 16px exactly: anything smaller makes iOS Safari zoom in on focus. */
+    .form-control, .quick-start input { width: 100%; font-size: 16px; }
+
+    /* Depth and level stack rather than squeezing into half a phone width. */
+    .form-row { flex-direction: column; gap: 0; }
+
+    .page-header h1 { font-size: 1.75rem; }
+    .page-header p { font-size: 1rem; }
+    .hero-title { font-size: 1.6rem; }
+
+    body { font-size: 16px; }
+    .card { padding: 18px; }
+
+    /* Input on its own row, then the four destinations as a 2x2 grid. */
+    .quick-start-buttons { display: grid; grid-template-columns: 1fr 1fr; }
+    .quick-start-buttons .btn { width: 100%; }
+
+    .follow-up-msg { max-width: 100%; }
+    .follow-up-form button { width: 100%; justify-content: center; }
+
+    .quiz-q { padding: .75rem; }
+    .run-text { font-size: .8rem; }
+}
+
+/* A bare <i> carrying one of the feature colours (the About page's Key Features
+   list) is a glyph, not a badge: take the colour from the gradient's stronger
+   stop and drop the box. The .feature-icon / .model-icon circles on Home and
+   Settings wrap the glyph in a div and keep their gradients. */
+i.text-icon, i.code-icon, i.audio-icon, i.image-icon {
+    background: none;
+    padding: 0;
+    width: 1.6em;
+    height: auto;
+    border-radius: 0;
+    font-size: 1.5rem;
+    text-align: center;
+}
+
+i.text-icon { color: #667eea; }
+i.code-icon { color: #f5576c; }
+i.audio-icon { color: #4facfe; }
+i.image-icon { color: #43e97b; }

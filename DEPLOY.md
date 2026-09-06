@@ -78,6 +78,26 @@ image path already retries on 429 and 5xx.
 **Static files** are served by Flask through the function rather than the CDN.
 Fine at this size; move `static/` to a separate route if it ever matters.
 
+**The Run button costs the server nothing.** Generated code executes in the
+learner's browser via Pyodide (CPython compiled to WebAssembly) inside
+`static/js/pyworker.js`, never on the function. It downloads about 15 MB from
+`cdn.jsdelivr.net` on first use and caches it; if the CDN is unreachable, every
+page still loads and generates normally and only Run reports an error.
+
+Two things about that worker are deliberate and easy to break:
+
+- It is a **module worker** loading `pyodide.mjs` with a dynamic `import()`,
+  not the classic build with `importScripts`. Cross-origin `importScripts` is
+  blocked in some environments (it failed outright in the browser used for
+  testing while `fetch` and `import()` both worked), and the ESM build then
+  loads its own sub-assets the same way. Keep
+  `new Worker(url, { type: 'module' })` in `static/js/code_generation.js`.
+- **No SRI hash on Pyodide.** Every other CDN asset in `base.html` carries
+  `integrity` + `crossorigin`, but Subresource Integrity does not apply to a
+  worker's own imports, and Pyodide fetches `pyodide.asm.wasm`, the stdlib zip
+  and each package at runtime - those cannot be hashed ahead of time either.
+  The version is pinned in `PYODIDE_BASE` instead; bump it deliberately.
+
 ## Running locally
 
 ```bash
@@ -92,4 +112,6 @@ Run the checks:
 python -m utils.test_code_extraction
 python -m utils.test_code_smells
 python -m utils.test_prompt_enhance
+python -m utils.test_code_sections
+python -m utils.test_quiz
 ```

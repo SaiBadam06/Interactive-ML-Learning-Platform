@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const topic = document.getElementById('topic').value.trim();
         const length = document.getElementById('length').value;
+        const level = document.getElementById('level').value;
 
         if (!topic) {
             showToast('Please enter a topic', 'error');
@@ -17,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         try {
-            showLoading(true);
+            showLoading(true, 'Generating 3 images - usually 30-90 s');
             
             const response = await fetch('/api/generate-images', {
                 method: 'POST',
@@ -26,7 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     topic,
-                    length
+                    length,
+                    level
                 })
             });
             
@@ -63,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 outputSection.style.display = 'block';
                 outputSection.scrollIntoView({ behavior: 'smooth' });
+                rememberTopic(topic);
                 showToast('Images generated successfully!', 'success');
             } else {
                 throw new Error('Failed to generate content');

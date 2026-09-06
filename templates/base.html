@@ -41,6 +41,7 @@
                 <li><a href="{{ url_for('code_generation') }}" class="nav-link"><i class="fas fa-code"></i> Code</a></li>
                 <li><a href="{{ url_for('audio_learning') }}" class="nav-link"><i class="fas fa-headphones"></i> Audio</a></li>
                 <li><a href="{{ url_for('image_visualization') }}" class="nav-link"><i class="fas fa-image"></i> Images</a></li>
+                <li><a href="{{ url_for('practice') }}" class="nav-link"><i class="fas fa-circle-question"></i> Practice</a></li>
                 <li><a href="{{ url_for('settings') }}" class="nav-link"><i class="fas fa-cog"></i> Settings</a></li>
                 <li><a href="{{ url_for('about') }}" class="nav-link"><i class="fas fa-info-circle"></i> About</a></li>
             </ul>
@@ -73,7 +74,8 @@
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="spinner"></div>
-        <p>Generating your personalized learning content...</p>
+        <p id="loadingMessage">Generating your personalized learning content...</p>
+        <p class="loading-elapsed" id="loadingElapsed"></p>
     </div>
 
     <!-- Scripts -->

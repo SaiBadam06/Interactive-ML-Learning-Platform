@@ -8,7 +8,7 @@ import base64
 import tempfile
 
 # Import utility modules
-from utils.genai_utils import call_genai, call_followup, explain_code_sections
+from utils.genai_utils import call_genai, call_followup, explain_code_sections, generate_quiz
 from utils.audio_utils import text_to_audio
 from utils.code_executor import detect_dependencies, save_code_to_file
 from utils.image_utils import generate_images, get_model_info
@@ -70,18 +70,20 @@ AUDIO_DIR = os.path.join(DATA_DIR, 'generated_audio')
 CODE_DIR = os.path.join(DATA_DIR, 'generated_code')
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg'}
 VALID_LENGTHS = {'Brief', 'Detailed', 'Comprehensive'}
+VALID_LEVELS = {'Beginner', 'Intermediate', 'Advanced'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 os.environ['DATA_DIR'] = DATA_DIR  # utils/ read this to place their output
 
 
 def read_request():
-    """Validated (topic, length, api_key) from the JSON body, tolerant of bad input."""
+    """Validated (topic, length, level, api_key) from the JSON body, tolerant of bad input."""
     data = request.get_json(silent=True) or {}
     topic = str(data.get('topic') or '').strip()[:300]
     length = data.get('length') if data.get('length') in VALID_LENGTHS else 'Brief'
+    level = data.get('level') if data.get('level') in VALID_LEVELS else 'Beginner'
     api_key = str(data.get('api_key') or '').strip() or os.getenv('NVIDIA_API_KEY', '').strip()
-    return topic, length, api_key
+    return topic, length, level, api_key
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -112,6 +114,11 @@ def image_visualization():
     """Image visualization page"""
     return render_template('image_visualization.html')
 
+@app.route('/practice')
+def practice():
+    """Practice page: quiz only, no explanation needed first"""
+    return render_template('practice.html')
+
 @app.route('/settings')
 def settings():
     """Settings page"""
@@ -127,7 +134,7 @@ def about():
 def generate_text():
     """Generate text explanation"""
     try:
-        topic, length, api_key = read_request()
+        topic, length, level, api_key = read_request()
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -136,7 +143,7 @@ def generate_text():
             return jsonify({'error': 'API key is required'}), 400
         
         # Generate content
-        result = call_genai(api_key, topic, length, "Text explanation")
+        result = call_genai(api_key, topic, length, "Text explanation", level=level)
         
         if result:
             briefing, _, _, _ = result
@@ -155,7 +162,7 @@ def generate_text():
 def generate_code():
     """Generate code with explanation"""
     try:
-        topic, length, api_key = read_request()
+        topic, length, level, api_key = read_request()
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -164,7 +171,7 @@ def generate_code():
             return jsonify({'error': 'API key is required'}), 400
         
         # Generate content
-        result = call_genai(api_key, topic, length, "Code with explanation")
+        result = call_genai(api_key, topic, length, "Code with explanation", level=level)
         
         if result:
             briefing, code_content, _, _ = result
@@ -177,15 +184,13 @@ def generate_code():
             # Save code to file
             code_filename = save_code_to_file(code_content, topic) if code_content else None
 
-            # Section-by-section breakdown of the finished program. Best effort:
-            # an empty list just means the page falls back to the prose walkthrough.
-            sections = explain_code_sections(api_key, code_content, topic)
-
+            # The section-by-section breakdown is a second model call and used to
+            # run here, which doubled this route to ~90 s before the learner saw
+            # anything. The page now asks /api/code-sections for it separately.
             return jsonify({
                 'success': True,
                 'explanation': briefing,
                 'code': code_content,
-                'sections': sections,
                 'dependencies': dependencies,
                 'filename': code_filename
             })
@@ -200,7 +205,7 @@ def generate_code():
 def generate_audio():
     """Generate audio explanation"""
     try:
-        topic, length, api_key = read_request()
+        topic, length, level, api_key = read_request()
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -209,7 +214,7 @@ def generate_audio():
             return jsonify({'error': 'API key is required'}), 400
         
         # Generate content
-        result = call_genai(api_key, topic, length, "Audio")
+        result = call_genai(api_key, topic, length, "Audio", level=level)
         
         if result:
             briefing, _, audio_script, _ = result
@@ -240,7 +245,7 @@ def generate_audio():
 def generate_images_api():
     """Generate images for visualization"""
     try:
-        topic, length, api_key = read_request()
+        topic, length, level, api_key = read_request()
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -249,7 +254,7 @@ def generate_images_api():
             return jsonify({'error': 'API key is required'}), 400
         
         # Generate content with image prompts
-        result = call_genai(api_key, topic, length, "Image Explanation")
+        result = call_genai(api_key, topic, length, "Image Explanation", level=level)
         
         if result:
             briefing, _, _, image_prompts = result
@@ -281,6 +286,7 @@ def follow_up():
         topic = str(data.get('topic') or '').strip()[:300]
         context = str(data.get('context') or '')
         history = data.get('history') if isinstance(data.get('history'), list) else []
+        level = data.get('level') if data.get('level') in VALID_LEVELS else 'Beginner'
         api_key = str(data.get('api_key') or '').strip() or os.getenv('NVIDIA_API_KEY', '').strip()
 
         if not question:
@@ -288,12 +294,56 @@ def follow_up():
         if not api_key:
             return jsonify({'error': 'API key is required'}), 400
 
-        answer = call_followup(api_key, topic, context, history, question)
+        answer = call_followup(api_key, topic, context, history, question, level)
         if not answer:
             return jsonify({'error': 'No answer could be generated. Please try again.'}), 502
         return jsonify({'success': True, 'answer': answer})
     except Exception as e:
         logger.error(f"Error in follow_up: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/code-sections', methods=['POST'])
+def code_sections():
+    """Section-by-section breakdown of a program the page already has in hand."""
+    try:
+        data = request.get_json(silent=True) or {}
+        code = str(data.get('code') or '')[:20000]
+        topic = str(data.get('topic') or '').strip()[:300]
+        api_key = str(data.get('api_key') or '').strip() or os.getenv('NVIDIA_API_KEY', '').strip()
+
+        if not code.strip():
+            return jsonify({'error': 'Code is required'}), 400
+        if not api_key:
+            return jsonify({'error': 'API key is required'}), 400
+
+        sections = explain_code_sections(api_key, code, topic)
+        if not sections:
+            return jsonify({'error': 'No section breakdown could be generated.'}), 502
+        return jsonify({'success': True, 'sections': sections})
+    except Exception as e:
+        logger.error(f"Error in code_sections: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/quiz', methods=['POST'])
+def quiz():
+    """Multiple-choice self-check for a topic, optionally about material already shown."""
+    try:
+        topic, _, level, api_key = read_request()
+        context = str((request.get_json(silent=True) or {}).get('context') or '')[:6000]
+
+        if not topic:
+            return jsonify({'error': 'Topic is required'}), 400
+        if not api_key:
+            return jsonify({'error': 'API key is required'}), 400
+
+        result = generate_quiz(api_key, topic, context, level)
+        if not result['questions']:
+            return jsonify({'error': 'No quiz could be generated. Please try again.'}), 502
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        logger.error(f"Error in quiz: {e}")
         return jsonify({'error': str(e)}), 500
 
 
