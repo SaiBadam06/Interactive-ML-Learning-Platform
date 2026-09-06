@@ -1,7 +1,10 @@
 # Deploying to Vercel
 
-The repo is already configured: `api/index.py` (WSGI entrypoint), `vercel.json`
-(routing + function limits) and `.vercelignore`.
+The repo is already configured: `vercel.json` (function limits) and
+`.vercelignore`. Vercel serves `app.py` at the repo root directly as the
+function - there is no wrapper and no rewrite. Do not add a
+`"/(.*)" -> "/api/index"` rewrite: Flask then receives `/api/index` as the path
+for every request and returns its own 404 for every page.
 
 ## 1. Get a fresh API key
 
@@ -50,8 +53,10 @@ four features once — the first request after a deploy pays a cold start.
 ## Things that will bite you
 
 **Generated files are temporary.** On Vercel only `/tmp` is writable, and it is
-per-instance and wiped between cold starts. `api/index.py` sets `DATA_DIR=/tmp`
-for this reason. Audio is returned inline as a data URI so playback does not
+per-instance and wiped between cold starts. `app.py` detects this (via the
+`VERCEL` environment variable) and writes under `/tmp`; creating directories in
+the read-only working directory otherwise crashes the function at import with
+`OSError: [Errno 30] Read-only file system`. Audio is returned inline as a data URI so playback does not
 depend on a later request landing on the same instance, but the
 `/api/download-code/<file>` and `/api/download-audio/<file>` links only work
 while that instance is warm. If you want durable downloads, put the files in
