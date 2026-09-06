@@ -487,19 +487,61 @@ body {
 }
 
 /* ===== Dependencies ===== */
+/* Block, not flex: the badges get their own flex row, and the install command
+   sits underneath it rather than becoming a sibling flex item. */
 .dependencies-content {
+    display: block;
+}
+
+.dependency-badges {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 10px;
 }
 
 .dependency-badge {
     background-color: var(--bg-tertiary);
-    padding: 8px 15px;
+    padding: 6px 14px;
     border-radius: 50px;
     font-size: 0.9rem;
     font-weight: 500;
+    line-height: 1.4;
     color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.install-command {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 10px 14px;
+    background-color: var(--bg-tertiary);
+    border-radius: 8px;
+}
+
+.install-command code {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    background: none;
+    padding: 0;
+    white-space: pre;
+}
+
+.install-command .install-copy {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+    .install-command { flex-direction: column; align-items: stretch; }
+    .install-command .install-copy { width: 100%; }
 }
 
 /* ===== Execution Guide ===== */
@@ -1427,4 +1469,65 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* Section-by-section code breakdown */
+.section-hint { color: #6b7280; font-size: .9rem; margin: -.25rem 0 1rem; }
+.code-sections { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.code-section {
+    border-left: 3px solid #4338ca;
+    padding-left: 1rem;
+}
+
+.code-section-title {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: .6rem;
+}
+
+.code-section-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #4338ca;
+    color: #fff;
+    font-size: .8rem;
+}
+
+.code-section-lines {
+    margin-left: auto;
+    font-size: .78rem;
+    font-weight: 400;
+    color: #6b7280;
+    white-space: nowrap;
+}
+
+.code-section-code {
+    margin: 0 0 .6rem;
+    padding: .75rem 1rem;
+    overflow-x: auto;
+    border-radius: 8px;
+    font-size: .85rem;
+    line-height: 1.5;
+}
+
+.code-section-explanation {
+    margin: 0;
+    line-height: 1.7;
+    color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+    .code-section { padding-left: .75rem; }
+    .code-section-title { flex-wrap: wrap; }
+    .code-section-lines { margin-left: 0; width: 100%; }
+    .code-section-code { font-size: .78rem; }
 }

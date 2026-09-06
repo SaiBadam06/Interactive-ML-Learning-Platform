@@ -1,5 +1,6 @@
 import ast
 import builtins
+import json
 import re
 import requests
 import time
@@ -73,6 +74,87 @@ def call_followup(api_key, topic, context, history, question):
         if answer:
             return answer
     return None
+
+def explain_code_sections(api_key, code, topic=None):
+    """
+    Split a generated program into consecutive sections and explain each one.
+
+    Runs as its own call with the finished code in hand, which is far more
+    reliable than asking for it in the same response as the code. Returns a list
+    of {"title", "code", "explanation"} dicts, or [] if the model does not come
+    back with something usable - the prose walkthrough still covers the program
+    in that case, so this degrades quietly.
+
+    JSON is used rather than custom markers: it either parses or it does not,
+    and every quoted line is checked against the real program so a hallucinated
+    snippet cannot be presented as the learner's code.
+    """
+    numbered = "\n".join(f"{i + 1}: {line}" for i, line in enumerate(code.splitlines()))
+    prompt = (
+        f"Here is a Python program{' about ' + topic if topic else ''}, with line numbers added:\n\n"
+        f"{numbered[:12000]}\n\n"
+        "Split this program into 4 to 8 consecutive sections that each do one job "
+        "(for example: imports, hyperparameters, environment setup, the training loop, "
+        "the update rule, printing results).\n\n"
+        "Reply with ONLY a JSON array, no prose before or after it. Each element:\n"
+        '{"title": "short name for the section", '
+        '"start_line": <first line number>, "end_line": <last line number>, '
+        '"explanation": "what this whole section does and why it is needed, 2-4 sentences"}\n\n'
+        "Rules: cover the program in order from line 1 to the last line with no gaps and no "
+        "overlaps; use the line numbers exactly as shown; do not include the code itself in "
+        "the JSON; write explanations in plain sentence case with no markdown."
+    )
+
+    lines = code.splitlines()
+    for model in (NIM_TEXT_MODEL, NIM_CODE_MODEL):
+        raw = _chat(api_key, [{"role": "user", "content": prompt}], model, max_tokens=3000)
+        if not raw:
+            continue
+
+        match = re.search(r"\[.*\]", raw, re.DOTALL)
+        if not match:
+            logger.warning(f"{model} returned no JSON array for code sections")
+            continue
+        try:
+            parsed = json.loads(match.group(0))
+        except json.JSONDecodeError as e:
+            logger.warning(f"{model} returned unparseable section JSON: {e}")
+            continue
+        if not isinstance(parsed, list):
+            continue
+
+        sections = []
+        for item in parsed:
+            if not isinstance(item, dict):
+                continue
+            try:
+                start = int(item["start_line"])
+                end = int(item["end_line"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            # Clamp to the real program: the model invents ranges surprisingly often.
+            start = max(1, min(start, len(lines)))
+            end = max(start, min(end, len(lines)))
+            snippet = "\n".join(lines[start - 1:end]).strip("\n")
+            title = str(item.get("title") or "").strip()[:80]
+            explanation = str(item.get("explanation") or "").strip()
+            if not snippet.strip() or not explanation:
+                continue
+            sections.append({
+                "title": title or f"Lines {start}-{end}",
+                "code": snippet,
+                "explanation": explanation,
+                "start_line": start,
+                "end_line": end,
+            })
+
+        if len(sections) >= 2:
+            sections.sort(key=lambda s: s["start_line"])
+            return sections
+        logger.warning(f"{model} produced too few usable sections; trying next model")
+
+    return []
+
 
 def _code_smells(code):
     """

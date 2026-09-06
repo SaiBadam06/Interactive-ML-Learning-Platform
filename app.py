@@ -7,7 +7,7 @@ import secrets
 import base64
 
 # Import utility modules
-from utils.genai_utils import call_genai, call_followup
+from utils.genai_utils import call_genai, call_followup, explain_code_sections
 from utils.audio_utils import text_to_audio
 from utils.code_executor import detect_dependencies, save_code_to_file
 from utils.image_utils import generate_images, get_model_info
@@ -140,11 +140,16 @@ def generate_code():
             
             # Save code to file
             code_filename = save_code_to_file(code_content, topic) if code_content else None
-            
+
+            # Section-by-section breakdown of the finished program. Best effort:
+            # an empty list just means the page falls back to the prose walkthrough.
+            sections = explain_code_sections(api_key, code_content, topic)
+
             return jsonify({
                 'success': True,
                 'explanation': briefing,
                 'code': code_content,
+                'sections': sections,
                 'dependencies': dependencies,
                 'filename': code_filename
             })
