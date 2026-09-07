@@ -70,6 +70,35 @@ WORDING = {
 }
 
 
+# What this tutor will teach, and what it refuses.
+#
+# Narrow on purpose. A tutor that also answers about history or cooking is a
+# worse tutor, because the learner cannot tell which answers are inside its
+# competence. The last rule matters as much as the first: most real questions
+# never say "machine learning", they say "attention" or "overfitting", and
+# refusing those would make the tool useless.
+REFUSAL = ("I only cover machine learning - classical ML, deep learning, generative AI "
+           "and reinforcement learning. Ask me about one of those and I will help.")
+
+SCOPE = (
+    "Scope: artificial intelligence and machine learning only. That includes "
+    "classical machine learning, deep learning, generative AI and large language "
+    "models, reinforcement learning, computer vision, natural language processing, "
+    "and the things these rest on: the maths behind them, how models are trained "
+    "and evaluated, datasets and features, and the Python libraries used to build "
+    "them such as numpy, pandas, scikit-learn, PyTorch and TensorFlow.\n"
+    "If a question is outside that, do not answer it, do not explain why at "
+    "length, and do not offer a related answer. Reply with exactly this sentence "
+    "and nothing else:\n"
+    f"{REFUSAL}\n"
+    "Judge the subject, not the wording. Gradient descent, attention, "
+    "backpropagation, overfitting, embeddings, tokenisation, a confusion matrix, "
+    "a learning rate or a transformer are all in scope even when the question "
+    "never uses the words machine learning. General programming, maths or "
+    "science questions with no connection to building a model are not.\n"
+)
+
+
 def _chat(api_key, messages, model, max_tokens=4096, temperature=0.7):
     """One NIM chat call. Returns the content string, or None on failure."""
     headers = {
@@ -430,15 +459,12 @@ def call_genai(api_key, topic, length, mode, previous_attempts=None, level="Begi
         Tuple of (briefing, code_content, audio_script, image_prompts)
     """
     audience = AUDIENCE.get(level, AUDIENCE["Beginner"]) + WORDING.get(wording, "")
+    scope = SCOPE
     # Enhanced prompt construction
     base_prompt = f"""
-You are an expert educational tutor providing content for topics related to Computer Science, Software Development, Technology, Artificial Intelligence (AI), Machine Learning (ML), and Deep Learning (DL).
+You are an expert educational tutor for artificial intelligence and machine learning.
 
-TOPIC SCOPE:
-- You should respond to topics related to: AI, ML, Deep Learning, Computer Science, Software Engineering, Programming, Data Science, Algorithms, Computer Systems, and Technology.
-- Examples of valid topics: KNN, neural networks, Python programming, data structures, algorithms, software design patterns, databases, web development, computer architecture, etc.
-- Focus on educational and technical content.
-
+{scope}
 Topic: "{topic}"
 Required format: {mode}
 Explanation depth: {length}

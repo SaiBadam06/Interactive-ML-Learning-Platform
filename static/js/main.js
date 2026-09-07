@@ -594,6 +594,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // Real tabs, not styled divs. Inactive panels keep their DOM - only the `hidden`
 // attribute goes on - so a run started in one panel keeps streaming while
 // another is open, and assistive tech and Ctrl+F both skip what is not shown.
+// Height of the sticky navbar plus a little air; the tab strip should sit
+// just below it after a switch, never underneath it.
+const TAB_STRIP_TOP = 76;
+
 function initTabs(root) {
     const list = root.querySelector('[role="tablist"]');
     if (!list) return;
@@ -609,7 +613,20 @@ function initTabs(root) {
             if (panel) panel.hidden = !on;
         });
         clearTabDot(tab.id);
-        if (focus) tab.focus();
+        if (focus) {
+            // focus() scrolls the tab into view by itself, which fights the
+            // adjustment below. Move the caret without moving the page.
+            tab.focus({ preventScroll: true });
+            // Panels differ in height by hundreds of pixels, so switching from
+            // a long one to a short one used to leave the reader parked below
+            // where the content now ends - the page looked empty or jumped.
+            // Put the strip back under the navbar so every switch lands in the
+            // same place.
+            const top = list.getBoundingClientRect().top;
+            if (top < TAB_STRIP_TOP || top > window.innerHeight * 0.6) {
+                list.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            }
+        }
         if (hash) {
             const name = tab.dataset.tab;
             try { history.replaceState(null, '', '#' + name); } catch (err) { /* file:// */ }

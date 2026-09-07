@@ -17,7 +17,7 @@ import tempfile
 
 # Import utility modules
 from utils.genai_utils import (call_genai, call_followup, explain_code_sections,
-                               generate_quiz, stream_chat, AUDIENCE, WORDING,
+                               generate_quiz, stream_chat, AUDIENCE, WORDING, SCOPE,
                                _extract_code, NIM_TEXT_MODEL, NIM_CODE_MODEL)
 from utils.audio_utils import text_to_audio
 from utils.code_executor import detect_dependencies, save_code_to_file
@@ -779,7 +779,8 @@ THINKING_BUDGET = 75          # seconds
 IMAGE_BUDGET = 120            # seconds for the three diagrams
 
 CHAT_SYSTEM = (
-    "You are a patient tutor for machine learning and computer science.\n"
+    "You are a patient tutor for artificial intelligence and machine learning.\n"
+    "{scope}"
     "{audience}{wording}"
     "Rules for every reply:\n"
     "- Plain text. No markdown symbols, no bold, no headings with #.\n"
@@ -856,7 +857,8 @@ def api_chat():
     if over_quota:
         return over_quota
 
-    system = CHAT_SYSTEM.format(audience=AUDIENCE.get(level, AUDIENCE['Beginner']),
+    system = CHAT_SYSTEM.format(scope=SCOPE,
+                                audience=AUDIENCE.get(level, AUDIENCE['Beginner']),
                                 wording=WORDING.get(wording, ''))
     system += MODE_SYSTEM.get(mode, '')
     messages = [{'role': 'system', 'content': system}] + turns

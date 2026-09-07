@@ -114,6 +114,54 @@ def test_server_rejects_unknown_wording():
         assert wording == "Simple"
 
 
+def test_every_entry_point_carries_the_subject_scope():
+    """The tutor answers about AI/ML only. That has to hold on every path into
+    the model, not just the one that was tested by hand."""
+    from utils import genai_utils
+    from utils.genai_utils import SCOPE, REFUSAL
+
+    captured = {}
+
+    def fake_chat(api_key, messages, model, **kwargs):
+        captured["text"] = "\n".join(m["content"] for m in messages)
+        return None
+
+    original = genai_utils._chat
+    genai_utils._chat = fake_chat
+    try:
+        genai_utils.call_genai("k", "q-learning", "Brief", "Text explanation")
+        assert SCOPE in captured["text"], "call_genai lost the scope rule"
+        assert REFUSAL in captured["text"]
+        # The old rule invited databases and web development; it must not return.
+        for stale in ("web development", "computer architecture", "design patterns"):
+            assert stale not in captured["text"], stale
+    finally:
+        genai_utils._chat = original
+
+
+def test_the_scope_does_not_refuse_its_own_subject():
+    """The failure that would matter most is over-refusal: almost no real
+    question says "machine learning", it says "attention" or "overfitting"."""
+    from utils.genai_utils import SCOPE
+
+    lowered = SCOPE.lower()
+    for term in ("gradient descent", "attention", "overfitting", "embeddings",
+                 "confusion matrix", "learning rate", "transformer"):
+        assert term in lowered, f"{term} should be named as in scope"
+    assert "judge the subject, not the wording" in lowered
+
+
+def test_the_refusal_is_one_plain_sentence():
+    """It is shown to a learner who asked something reasonable, so it says what
+    the tool does cover rather than only what it will not do."""
+    from utils.genai_utils import REFUSAL
+
+    assert REFUSAL.count(".") <= 2
+    assert "machine learning" in REFUSAL.lower()
+    assert "ask me about" in REFUSAL.lower()
+    assert "sorry" not in REFUSAL.lower()          # no apologising
+
+
 if __name__ == "__main__":
     passed = 0
     for name, fn in sorted(globals().items()):

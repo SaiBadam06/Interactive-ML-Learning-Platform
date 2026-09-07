@@ -1153,6 +1153,7 @@ textarea.form-control { min-height: 96px; }
 #outputSection,
 #skeleton,
 .results-head,
+.tablist,
 .tabpanel,
 .card-head,
 [id] > h2 {
