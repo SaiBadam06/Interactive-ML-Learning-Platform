@@ -1018,7 +1018,17 @@ textarea.form-control { min-height: 96px; }
 /* --- Auth pages (sign in, invite acceptance) ----------------------------- */
 /* Built from tokens only, so dark mode needs no second definition. */
 
-.auth-page { max-width: 30rem; }
+/* .container is full-bleed with margin:0, so a narrow page inside it needs its
+   own centring or it sits against the left edge. Sign in is one short card on
+   an otherwise empty screen, so it centres both ways. */
+.auth-page {
+    max-width: 30rem;
+    margin-inline: auto;
+    min-height: min(60vh, 34rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
 
 .auth-card { margin-top: var(--s5); }
 
@@ -1431,18 +1441,25 @@ textarea.form-control { min-height: 96px; }
 
 /* The window minus the sticky bar, the main padding and the footer, so the
    thread fills what is left and the page itself does not scroll. */
-.chat-page { --chat-chrome: 228px; }
+/* Fill whatever the page gives us rather than subtracting a measured guess for
+   the nav and footer. The guess drifts the moment either changes, and whatever
+   it over-estimates shows up as dead space under the composer. */
+body:has(.chat-page) .main-content { display: flex; min-height: 0; padding-bottom: var(--s5); }
+
+.chat-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
 
 .chat-shell {
     position: relative;                 /* the rail overlays this on small screens */
     display: grid;
     grid-template-columns: 248px minmax(0, 1fr);
     gap: var(--s5);
-    height: calc(100vh - var(--chat-chrome));
+    flex: 1 1 auto;
     min-height: 420px;
-}
-@supports (height: 100dvh) {
-    .chat-shell { height: calc(100dvh - var(--chat-chrome)); }
 }
 
 /* --- Rail --- */
@@ -1493,17 +1510,6 @@ textarea.form-control { min-height: 96px; }
 }
 .chat-rail-item:hover { background: var(--surface-2); }
 
-.chat-rail-foot {
-    display: flex;
-    align-items: center;
-    gap: var(--s2);
-    padding: var(--s3) var(--s3) 0;
-    border-top: 1px solid var(--hairline);
-    color: var(--ink-muted);
-    font-size: 14px;
-    text-decoration: none;
-}
-.chat-rail-foot:hover { color: var(--ink); }
 
 /* --- Thread column --- */
 
