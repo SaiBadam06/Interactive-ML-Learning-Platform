@@ -7,7 +7,11 @@ from datetime import timedelta
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import requests
+import re
 import secrets
+import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 import base64
 import tempfile
 
@@ -770,6 +774,10 @@ def model_info():
 
 VALID_MODES = {'explain', 'code', 'audio', 'images'}
 
+# How long a reply may spend reasoning before producing a word.
+THINKING_BUDGET = 75          # seconds
+IMAGE_BUDGET = 120            # seconds for the three diagrams
+
 CHAT_SYSTEM = (
     "You are a patient tutor for machine learning and computer science.\n"
     "{audience}{wording}"
@@ -858,13 +866,39 @@ def api_chat():
     # silence in a chat reads as broken, and the learner can always ask again.
     model = NIM_CODE_MODEL
 
+    # The scratchpad is never forwarded, only the fact that one is being written.
+    #
+    # Two reasons. It opens by reciting the instructions it was given, so the
+    # system prompt would be readable on screen, and filtering that out is a
+    # losing game - the model paraphrases ("We need open with everyday analogy")
+    # and a paraphrase cannot be matched reliably. And what survives is not worth
+    # reading: it is the model talking to itself about formatting rules, not
+    # about the subject. A heartbeat gives the same "it is working" signal
+    # without either problem.
     def events():
         answer = []
+        started = time.monotonic()
+        beat = 0.0                           # last heartbeat, seconds since start
+        seen_content = False
         try:
             for kind, piece in stream_chat(api_key, messages, model=model):
                 if kind == 'thinking':
-                    yield _sse({'type': 'thinking', 'text': piece})
+                    elapsed = time.monotonic() - started
+                    # A reasoning model can think for minutes. Rather than leave
+                    # the page waiting on a stream that may never turn into an
+                    # answer, give up and say so.
+                    if not seen_content and elapsed > THINKING_BUDGET:
+                        yield _sse({'type': 'error',
+                                    'error': 'That took too long to think about. Try asking '
+                                             'it in a shorter or more specific way.'})
+                        return
+                    # One beat a second is enough to keep the page honest about
+                    # what is happening, without forwarding the scratchpad.
+                    if elapsed - beat >= 1.0:
+                        beat = elapsed
+                        yield _sse({'type': 'thinking', 'seconds': round(elapsed)})
                 else:
+                    seen_content = True
                     answer.append(piece)
                     yield _sse({'type': 'content', 'text': piece})
         except Exception as exc:                    # network, HTTP, malformed stream
@@ -912,9 +946,21 @@ def api_chat():
                 yield _sse({'type': 'working',
                             'label': 'Drawing %d diagram%s' % (len(prompts),
                                                                '' if len(prompts) == 1 else 's')})
+                # generate_images retries per image and can sit for many minutes.
+                # A learner would be left on "Drawing 3 diagrams" with no way out
+                # but the Stop button, so give it a wall-clock budget. The thread
+                # is left to finish on its own; only the waiting is bounded.
                 try:
-                    done['images'] = generate_images(prompts, api_key, topic) or []
-                    done['prompts'] = prompts
+                    with ThreadPoolExecutor(max_workers=1) as pool:
+                        task = pool.submit(generate_images, prompts, api_key, topic)
+                        try:
+                            done['images'] = task.result(timeout=IMAGE_BUDGET) or []
+                            done['prompts'] = prompts
+                        except FuturesTimeout:
+                            logger.warning("chat images timed out after %ss", IMAGE_BUDGET)
+                            done['note'] = ('The diagrams are taking too long, so here is the '
+                                            'explanation on its own. Ask again to retry them.')
+                            pool.shutdown(wait=False, cancel_futures=True)
                 except Exception:
                     logger.warning("chat images failed", exc_info=True)
                     done['note'] = 'The diagrams could not be drawn, but the explanation is above.'

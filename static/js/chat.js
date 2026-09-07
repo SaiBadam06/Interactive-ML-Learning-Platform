@@ -188,23 +188,15 @@
         const turn = document.createElement('div');
         turn.className = 'chat-turn chat-turn-assistant';
 
-        const think = document.createElement('div');
+        // The server sends a heartbeat while the model reasons, never the
+        // scratchpad itself: it recites its own instructions and then talks to
+        // itself about formatting, which is neither the answer nor worth
+        // reading. This says it is working and how long it has been.
+        const think = document.createElement('p');
         think.className = 'chat-thinking';
         think.hidden = true;
-
-        const details = document.createElement('details');
-        details.className = 'disclosure chat-thinking-box';
-        const summary = document.createElement('summary');
-        summary.textContent = 'Thinking';
-        const body = document.createElement('div');
-        body.className = 'disclosure-body chat-thinking-body';
-        details.appendChild(summary);
-        details.appendChild(body);
-
-        const dismiss = makeBtn('Hide', 'btn btn-quiet chat-thinking-dismiss', () => think.remove());
-        dismiss.setAttribute('aria-label', 'Hide the thinking notes');
-        think.appendChild(details);
-        think.appendChild(dismiss);
+        think.setAttribute('role', 'status');
+        think.textContent = 'Thinking…';
 
         const prose = document.createElement('div');
         prose.className = 'chat-prose';
@@ -226,7 +218,7 @@
         turn.appendChild(actions);
         thread.appendChild(turn);
 
-        return { turn, think, details, body, prose, status, extras, actions };
+        return { turn, think, prose, status, extras, actions };
     }
 
     // Copy is useful; Simplify is the reason this page exists. It leads, and it
@@ -375,10 +367,6 @@
     function flush(stick) {
         frame = 0;
         if (!live) return;
-        if (live.thinkDirty) {
-            live.view.body.textContent = live.thinking;
-            live.thinkDirty = false;
-        }
         if (live.proseDirty) {
             live.view.prose.innerHTML = window.formatMarkdown(live.text);
             live.proseDirty = false;
@@ -394,19 +382,16 @@
 
     function handleEvent(event, view) {
         if (event.type === 'thinking') {
-            live.thinking += String(event.text || '');
-            live.thinkDirty = true;
             if (view.think.isConnected) {
+                const seconds = Number(event.seconds) || 0;
                 view.think.hidden = false;
-                if (!view.details.dataset.settled) view.details.open = true;
+                view.think.textContent = seconds > 2
+                    ? 'Thinking… ' + seconds + 's'
+                    : 'Thinking…';
             }
-            paint();
         } else if (event.type === 'content') {
-            // The scratchpad is not the answer: fold it the moment one starts.
-            if (!view.details.dataset.settled) {
-                view.details.dataset.settled = 'true';
-                view.details.open = false;
-            }
+            // Thinking is over the moment a word of the answer arrives.
+            view.think.hidden = true;
             live.text += String(event.text || '');
             live.proseDirty = true;
             paint();
@@ -450,9 +435,19 @@
         return done;
     }
 
-    function finishTurn(view, done) {
+    function finishTurn(view, done, stopped) {
         const stick = nearBottom();
         if (frame) { cancelAnimationFrame(frame); frame = 0; }
+
+        // "New lesson" aborts mid-stream and empties the thread. The rejection
+        // lands here a tick later, so without this the half-written answer would
+        // be pushed back into the conversation the learner just cleared.
+        if (!view.turn.isConnected) {
+            live = null;
+            controller = null;
+            setBusy(false);
+            return;
+        }
 
         let text = live ? live.text.trim() : '';
         // The fence is rendered below as a real listing, so it is not left in the
@@ -463,7 +458,7 @@
         view.prose.innerHTML = text ? window.formatMarkdown(text) : '';
         view.turn.classList.remove('is-streaming');
         view.status.hidden = true;
-        if (view.think.isConnected) view.details.open = false;
+        view.think.hidden = true;               // nothing is being thought about now
 
         if (text) {
             messages.push({ role: 'assistant', content: text });
@@ -473,7 +468,15 @@
         if (done) renderExtras(view, done);
         if (text) addActions(view, text);
         if (!text && !view.extras.childNodes.length) {
-            showError(view, 'Nothing came back. Ask again in a moment.');
+            // Stopping is a choice, not a failure, so it is not reported as one.
+            if (stopped) {
+                const note = document.createElement('p');
+                note.className = 'section-hint chat-note';
+                note.textContent = 'Stopped.';
+                view.extras.appendChild(note);
+            } else {
+                showError(view, 'Nothing came back. Ask again in a moment.');
+            }
         }
 
         live = null;
@@ -505,11 +508,12 @@
 
         const view = addAssistantTurn();
         view.turn.classList.add('is-streaming');
-        live = { view: view, text: '', thinking: '', proseDirty: false, thinkDirty: false };
+        live = { view: view, text: '', proseDirty: false };
         scrollToEnd();
 
         controller = new AbortController();
         let done = null;
+        let stopped = false;
         try {
             // main.js wraps fetch and adds the CSRF header and the reading level.
             const res = await fetch('/api/chat', {
@@ -530,11 +534,13 @@
             }
             done = await readStream(res.body, view);
         } catch (err) {
-            if (!err || err.name !== 'AbortError') {
+            if (err && err.name === 'AbortError') {
+                stopped = true;
+            } else {
                 showError(view, err && err.message);
             }
         }
-        finishTurn(view, done);
+        finishTurn(view, done, stopped);
     }
 
     // ---------- wiring ------------------------------------------------------

@@ -75,22 +75,29 @@ def test_last_message_must_be_the_learners():
     assert post(client, {"messages": [{"role": "assistant", "content": "hi"}]}).status_code == 400
 
 
-def test_thinking_never_reaches_the_answer():
-    """The model streams its scratchpad first. It has to stay a separate event
-    type, or the learner reads the model's private notes as the lesson."""
+def test_the_scratchpad_is_never_forwarded():
+    """The model reasons before it answers. None of that text may reach the
+    page: it recites its own instructions, so forwarding it would put the
+    system prompt on screen. Only a heartbeat goes out."""
     flask_app = build()
     client = client_with_session(flask_app)
-    stub(flask_app, [("thinking", "let me think"), ("thinking", " harder"),
+    stub(flask_app, [("thinking", "Plain text. No markdown symbols, no bold.\n"),
+                     ("thinking", " Do not write a glossary.\n"),
                      ("content", "Q-learning is"), ("content", " a method.")])
     response = post(client, {"messages": [{"role": "user", "content": "q-learning"}]})
     assert response.status_code == 200
     assert response.mimetype == "text/event-stream"
     events = events_from(response)
-    thinking = "".join(e["text"] for e in events if e["type"] == "thinking")
+
+    thinking = [e for e in events if e["type"] == "thinking"]
+    for beat in thinking:
+        assert "text" not in beat, "the scratchpad must not be forwarded"
+        assert set(beat) <= {"type", "seconds"}
+    blob = json.dumps(events)
+    assert "glossary" not in blob and "markdown symbols" not in blob
+
     content = "".join(e["text"] for e in events if e["type"] == "content")
-    assert thinking == "let me think harder"
     assert content == "Q-learning is a method."
-    assert "think" not in content
     assert events[-1]["type"] == "done"
 
 
@@ -170,6 +177,31 @@ def test_modes_are_the_four_the_page_offers():
     flask_app = build()
     assert flask_app.VALID_MODES == {"explain", "code", "audio", "images"}
     assert set(flask_app.MODE_QUOTA) == flask_app.VALID_MODES
+
+
+def test_thinking_that_never_becomes_an_answer_gives_up():
+    """A reasoning model can think for minutes. The page must not wait forever."""
+    flask_app = build()
+    client = client_with_session(flask_app)
+    flask_app.THINKING_BUDGET = 0            # every chunk is already over budget
+    stub(flask_app, [("thinking", "wondering about something at length")])
+    events = events_from(post(client, {"messages": [{"role": "user", "content": "hi"}]}))
+    assert events[-1]["type"] == "error"
+    assert "too long" in events[-1]["error"].lower()
+
+
+def test_the_budget_does_not_cut_off_a_reply_in_progress():
+    """Once words are arriving the budget must stop applying, or a long answer
+    would be truncated mid-sentence."""
+    flask_app = build()
+    client = client_with_session(flask_app)
+    flask_app.THINKING_BUDGET = 0
+    stub(flask_app, [("content", "Overfitting is "), ("thinking", "hmm"),
+                     ("content", "memorising.")])
+    events = events_from(post(client, {"messages": [{"role": "user", "content": "hi"}]}))
+    assert events[-1]["type"] == "done"
+    content = "".join(e["text"] for e in events if e["type"] == "content")
+    assert content == "Overfitting is memorising."
 
 
 if __name__ == "__main__":

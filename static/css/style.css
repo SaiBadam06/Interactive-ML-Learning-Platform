@@ -1721,3 +1721,21 @@ textarea.form-control { min-height: 96px; }
     .chat-rail-item { min-height: 44px; }
     .chat-send { flex: 1 1 auto; }
 }
+
+/* --- Theme switch on the chat page --------------------------------------- */
+/* Everywhere else the page scrolls and the sticky switch scrolls away with it.
+   The chat is a fixed shell whose thread scrolls inside itself, so the switch
+   would sit over the first line of every answer for good. Reserve its corner. */
+body:has(.chat-page) .chat-thread { padding-top: 46px; }
+
+@media (max-width: 700px) {
+    body:has(.chat-page) .chat-thread { padding-top: 40px; }
+}
+
+/* The thinking panel is now a one-line heartbeat, not a scratchpad disclosure. */
+.chat-thinking {
+    margin: 0 0 var(--s3);
+    color: var(--ink-muted);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;   /* the seconds must not jitter */
+}
