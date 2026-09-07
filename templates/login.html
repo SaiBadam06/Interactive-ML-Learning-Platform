@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in - ML Learning Assistant{% endblock %}
+
+{% block content %}
+<div class="container auth-page">
+    <div class="page-header">
+        <h1><i class="fas fa-right-to-bracket"></i> Sign in</h1>
+        <p>Accounts are invite only. Ask the owner for an invite if you do not have one yet.</p>
+    </div>
+
+    <div class="card auth-card">
+        <div class="auth-alert" id="authAlert" role="alert" hidden></div>
+
+        <form id="signInForm" novalidate>
+            <div class="form-group">
+                <label for="email"><i class="fas fa-envelope"></i> Email</label>
+                <input type="email" id="email" name="email" class="form-control"
+                       autocomplete="email" inputmode="email" spellcheck="false"
+                       autocapitalize="none" required aria-describedby="emailError"
+                       placeholder="you@example.com">
+                <p class="field-error" id="emailError" hidden></p>
+            </div>
+
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i> Password</label>
+                <input type="password" id="password" name="password" class="form-control"
+                       autocomplete="current-password" required aria-describedby="passwordError">
+                <p class="field-error" id="passwordError" hidden></p>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-large" id="signInBtn">
+                <i class="fas fa-arrow-right-to-bracket" aria-hidden="true" id="signInIcon"></i>
+                <span id="signInLabel">Sign in</span>
+            </button>
+        </form>
+
+        <p class="form-hint auth-secondary">
+            Forgotten your password?
+            <button type="button" class="link-button" id="forgotBtn">Email me a reset link</button>
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="application/json" id="app-config">{{ app_config | tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.min.js"
+        integrity="sha384-EyR2P0dlmjnEGcm9xcjdAn0VedZpRHEwDLP9oSS6wYMvzHBHkUrvgonveazJ/sSx"
+        crossorigin="anonymous"></script>
+<script>
+// Configuration arrives as JSON, never as interpolated JavaScript.
+(function () {
+    var cfg = JSON.parse(document.getElementById('app-config').textContent);
+    var form = document.getElementById('signInForm');
+    var emailEl = document.getElementById('email');
+    var passwordEl = document.getElementById('password');
+    var button = document.getElementById('signInBtn');
+    var icon = document.getElementById('signInIcon');
+    var label = document.getElementById('signInLabel');
+    var alertBox = document.getElementById('authAlert');
+    var EMAIL = /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/;
+
+    var client = (window.supabase && cfg.supabase_url && cfg.supabase_anon_key)
+        ? window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key)
+        : null;
+
+    function say(message, kind) {
+        alertBox.textContent = message;
+        alertBox.className = 'auth-alert ' + (kind || 'error');
+        alertBox.hidden = !message;
+    }
+
+    function mark(input, errorId, message) {
+        var box = document.getElementById(errorId);
+        box.textContent = message || '';
+        box.hidden = !message;
+        input.classList.toggle('invalid', !!message);
+        input.setAttribute('aria-invalid', message ? 'true' : 'false');
+        return !message;
+    }
+
+    function busy(on, text) {
+        button.disabled = on;
+        icon.className = on ? 'fas fa-spinner fa-spin' : 'fas fa-arrow-right-to-bracket';
+        label.textContent = on ? (text || 'Working...') : 'Sign in';
+    }
+
+    function checkEmail() {
+        var value = emailEl.value.trim();
+        if (!value) return mark(emailEl, 'emailError', 'Enter the email address your invite was sent to.');
+        if (!EMAIL.test(value)) return mark(emailEl, 'emailError',
+            'That address is missing an @ or a domain - check it for a typo.');
+        return mark(emailEl, 'emailError', '');
+    }
+
+    function checkPassword() {
+        if (!passwordEl.value) return mark(passwordEl, 'passwordError', 'Enter your password.');
+        return mark(passwordEl, 'passwordError', '');
+    }
+
+    // Validate on the way out of a field, then live once it is already wrong.
+    emailEl.addEventListener('blur', checkEmail);
+    passwordEl.addEventListener('blur', checkPassword);
+    emailEl.addEventListener('input', function () { if (emailEl.classList.contains('invalid')) checkEmail(); });
+    passwordEl.addEventListener('input', function () { if (passwordEl.classList.contains('invalid')) checkPassword(); });
+
+    function exchange(accessToken, next) {
+        return fetch('/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': cfg.csrf },
+            body: JSON.stringify({ access_token: accessToken, next: next || cfg.next || '/' })
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+                if (!response.ok) {
+                    throw new Error(data.error || 'Your session could not be started. Please try again.');
+                }
+                window.location.href = data.next || '/';
+            });
+        });
+    }
+
+    function readable(error) {
+        var message = (error && error.message ? error.message : '').toLowerCase();
+        if (message.indexOf('not confirmed') !== -1) {
+            return 'This account has not been activated yet. Open the invite link you were sent first.';
+        }
+        if (message.indexOf('failed to fetch') !== -1 || message.indexOf('network') !== -1) {
+            return 'Could not reach the sign-in service. Check your connection and try again.';
+        }
+        if (message.indexOf('rate') !== -1 || message.indexOf('too many') !== -1) {
+            return 'Too many attempts. Wait a minute, then try again.';
+        }
+        return 'That email and password do not match an account. Check the address, ' +
+               'or ask the owner to send you a fresh invite link.';
+    }
+
+    if (!client) {
+        say('The sign-in library could not be loaded. Reload the page; if it keeps failing, ' +
+            'your network may be blocking cdn.jsdelivr.net.', 'error');
+        button.disabled = true;
+    } else {
+        // The Flask cookie lasts 12 hours; the Supabase session in this browser
+        // outlives it. If one is still valid, swap it for a new cookie silently
+        // rather than asking for the password again.
+        client.auth.getSession().then(function (result) {
+            var session = result && result.data && result.data.session;
+            if (session && session.access_token) {
+                exchange(session.access_token).catch(function () { /* fall through to the form */ });
+            }
+        });
+    }
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (button.disabled) return;           // no double submit
+        var okEmail = checkEmail();
+        var okPassword = checkPassword();
+        if (!okEmail || !okPassword) {
+            (okEmail ? passwordEl : emailEl).focus();
+            return;
+        }
+        say('');
+        busy(true, 'Signing in...');
+        client.auth.signInWithPassword({
+            email: emailEl.value.trim(), password: passwordEl.value
+        }).then(function (result) {
+            if (result.error || !result.data || !result.data.session) {
+                throw result.error || new Error('no session');
+            }
+            return exchange(result.data.session.access_token);
+        }).catch(function (error) {
+            say(readable(error), 'error');
+            busy(false);
+            passwordEl.focus();
+            passwordEl.select();
+        });
+    });
+
+    document.getElementById('forgotBtn').addEventListener('click', function () {
+        if (!client || !checkEmail()) { emailEl.focus(); return; }
+        var target = this;
+        target.disabled = true;
+        target.textContent = 'Sending...';
+        client.auth.resetPasswordForEmail(emailEl.value.trim(), {
+            redirectTo: window.location.origin + '/auth/callback'
+        }).then(function () {
+            // Deliberately the same message either way: whether an address has an
+            // account is not something a sign-in page should reveal.
+            say('If that address has an account, a reset link is on its way. It can be used ' +
+                'once and expires, so open it soon. Nothing arrived? The owner can send you a ' +
+                'fresh link directly.', 'info');
+        }).catch(function () {
+            say('The reset email could not be sent. Ask the owner for a fresh link.', 'error');
+        }).then(function () {
+            target.disabled = false;
+            target.textContent = 'Email me a reset link';
+        });
+    });
+})();
+</script>
+{% endblock %}

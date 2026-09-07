@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}Set your password - ML Learning Assistant{% endblock %}
+
+{% block content %}
+<div class="container auth-page">
+    <div class="page-header">
+        <h1><i class="fas fa-key"></i> Set your password</h1>
+        <p id="calloutSubtitle">Checking your link...</p>
+    </div>
+
+    <div class="card auth-card">
+        <!-- Shown while supabase-js works out whether the link is still good. -->
+        <p class="auth-checking" id="checking"><i class="fas fa-spinner fa-spin"></i> One moment...</p>
+
+        <!-- Expired, already used, or opened without a link at all. -->
+        <div id="deadLink" hidden>
+            <div class="auth-alert error" role="alert">
+                <strong>This link cannot be used.</strong>
+                <span id="deadReason">Invite and reset links work once and then expire.</span>
+            </div>
+            <p class="form-hint">Ask the owner to send you a fresh invite link, then open the newest
+                one you were sent. Links do not work twice, and an old email will always fail.</p>
+            <p class="auth-secondary">
+                <a class="btn btn-secondary" href="{{ url_for('login') }}">
+                    <i class="fas fa-arrow-left"></i> Back to sign in</a>
+            </p>
+        </div>
+
+        <form id="passwordForm" hidden novalidate>
+            <p class="auth-alert info" id="whoami" role="status" hidden></p>
+            <div class="auth-alert error" id="formAlert" role="alert" hidden></div>
+
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i> New password</label>
+                <input type="password" id="password" class="form-control" autocomplete="new-password"
+                       required minlength="10" aria-describedby="passwordHint passwordError">
+                <div class="pw-meter" id="pwMeter" aria-hidden="true"><span></span></div>
+                <p class="form-hint" id="passwordHint">At least 10 characters. A short phrase you
+                    will remember beats a short jumble you will not.</p>
+                <p class="field-error" id="passwordError" hidden></p>
+            </div>
+
+            <div class="form-group">
+                <label for="confirm"><i class="fas fa-check-double"></i> Confirm password</label>
+                <input type="password" id="confirm" class="form-control" autocomplete="new-password"
+                       required aria-describedby="confirmError">
+                <p class="field-error" id="confirmError" hidden></p>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-large" id="saveBtn">
+                <i class="fas fa-check" aria-hidden="true" id="saveIcon"></i>
+                <span id="saveLabel">Set password and continue</span>
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="application/json" id="app-config">{{ app_config | tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.min.js"
+        integrity="sha384-EyR2P0dlmjnEGcm9xcjdAn0VedZpRHEwDLP9oSS6wYMvzHBHkUrvgonveazJ/sSx"
+        crossorigin="anonymous"></script>
+<script>
+(function () {
+    var MIN = 10;
+    var cfg = JSON.parse(document.getElementById('app-config').textContent);
+    // Read the fragment before supabase-js consumes and clears it: a used or
+    // expired link carries its reason there and nowhere else.
+    var hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    var query = new URLSearchParams(window.location.search);
+
+    var checking = document.getElementById('checking');
+    var dead = document.getElementById('deadLink');
+    var deadReason = document.getElementById('deadReason');
+    var subtitle = document.getElementById('calloutSubtitle');
+    var form = document.getElementById('passwordForm');
+    var whoami = document.getElementById('whoami');
+    var formAlert = document.getElementById('formAlert');
+    var passwordEl = document.getElementById('password');
+    var confirmEl = document.getElementById('confirm');
+    var meter = document.getElementById('pwMeter');
+    var button = document.getElementById('saveBtn');
+    var icon = document.getElementById('saveIcon');
+    var label = document.getElementById('saveLabel');
+
+    var client = (window.supabase && cfg.supabase_url && cfg.supabase_anon_key)
+        ? window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key)
+        : null;
+
+    function showDead(reason) {
+        checking.hidden = true;
+        form.hidden = true;
+        dead.hidden = false;
+        subtitle.textContent = 'That link is no longer valid.';
+        if (reason) deadReason.textContent = reason;
+    }
+
+    function mark(input, errorId, message) {
+        var box = document.getElementById(errorId);
+        box.textContent = message || '';
+        box.hidden = !message;
+        input.classList.toggle('invalid', !!message);
+        input.setAttribute('aria-invalid', message ? 'true' : 'false');
+        return !message;
+    }
+
+    function strength(value) {
+        var classes = ['weak', 'ok', 'good', 'strong'];
+        var score = 0;
+        if (value.length >= MIN) score += 1;
+        if (value.length >= 14) score += 1;
+        if (/[^a-zA-Z]/.test(value) && /[a-zA-Z]/.test(value)) score += 1;
+        return classes[Math.min(score, 3)];
+    }
+
+    passwordEl.addEventListener('input', function () {
+        meter.className = 'pw-meter ' + (passwordEl.value ? strength(passwordEl.value) : '');
+        if (passwordEl.classList.contains('invalid')) checkPassword();
+        if (confirmEl.value && confirmEl.classList.contains('invalid')) checkConfirm();
+    });
+    passwordEl.addEventListener('blur', checkPassword);
+    confirmEl.addEventListener('blur', checkConfirm);
+    confirmEl.addEventListener('input', function () {
+        if (confirmEl.classList.contains('invalid')) checkConfirm();
+    });
+
+    function checkPassword() {
+        var value = passwordEl.value;
+        if (!value) return mark(passwordEl, 'passwordError', 'Choose a password to finish setting up your account.');
+        if (value.length < MIN) {
+            return mark(passwordEl, 'passwordError',
+                'Too short - add ' + (MIN - value.length) + ' more character' +
+                (MIN - value.length === 1 ? '' : 's') + ' (' + MIN + ' minimum).');
+        }
+        return mark(passwordEl, 'passwordError', '');
+    }
+
+    function checkConfirm() {
+        if (!confirmEl.value) return mark(confirmEl, 'confirmError', 'Type the same password again.');
+        if (confirmEl.value !== passwordEl.value) {
+            return mark(confirmEl, 'confirmError', 'These two do not match. Retype the second one.');
+        }
+        return mark(confirmEl, 'confirmError', '');
+    }
+
+    function busy(on, text) {
+        button.disabled = on;
+        icon.className = on ? 'fas fa-spinner fa-spin' : 'fas fa-check';
+        label.textContent = on ? (text || 'Working...') : 'Set password and continue';
+    }
+
+    function exchange(accessToken) {
+        return fetch('/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': cfg.csrf },
+            body: JSON.stringify({ access_token: accessToken, next: cfg.next || '/' })
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+                if (!response.ok) throw new Error(data.error || 'Your session could not be started.');
+                window.location.href = data.next || '/';
+            });
+        });
+    }
+
+    // Supabase reports a spent or timed-out link in the fragment; nothing about
+    // it reaches the server, so this page has to read it.
+    var hashError = hash.get('error_description') || hash.get('error') ||
+                    query.get('error_description') || query.get('error');
+    var errorCode = hash.get('error_code') || query.get('error_code') || '';
+    if (hashError) {
+        showDead(/expired|invalid|otp/i.test(errorCode + ' ' + hashError)
+            ? 'It has already been used or it has expired - invite and reset links work once.'
+            : String(hashError).slice(0, 200));
+        return;
+    }
+    if (!client) {
+        showDead('The sign-in library could not be loaded. Reload the page, or check whether ' +
+                 'your network blocks cdn.jsdelivr.net.');
+        return;
+    }
+
+    function resolveSession() {
+        return client.auth.getSession().then(function (result) {
+            var session = result && result.data && result.data.session;
+            if (session) return session;
+            // Depending on the link type the tokens arrive in the fragment or as
+            // a code in the query string. Handle both rather than guessing.
+            if (hash.get('access_token')) {
+                return client.auth.setSession({
+                    access_token: hash.get('access_token'),
+                    refresh_token: hash.get('refresh_token') || ''
+                }).then(function (r) { return r.data && r.data.session; });
+            }
+            if (query.get('code')) {
+                return client.auth.exchangeCodeForSession(query.get('code'))
+                    .then(function (r) { return r.data && r.data.session; });
+            }
+            return null;
+        }).catch(function () { return null; });
+    }
+
+    resolveSession().then(function (session) {
+        if (!session || !session.access_token) {
+            showDead('It has already been used, it has expired, or the page was opened ' +
+                     'without a link.');
+            return;
+        }
+        checking.hidden = true;
+        form.hidden = false;
+        subtitle.textContent = 'Choose a password and you are in.';
+        var email = session.user && session.user.email;
+        if (email) {
+            whoami.textContent = 'Setting the password for ' + email + '.';
+            whoami.hidden = false;
+        }
+        passwordEl.focus();
+
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            if (button.disabled) return;       // no double submit
+            var okPassword = checkPassword();
+            var okConfirm = checkConfirm();
+            if (!okPassword || !okConfirm) {
+                (okPassword ? confirmEl : passwordEl).focus();
+                return;
+            }
+            formAlert.hidden = true;
+            busy(true, 'Saving...');
+            client.auth.updateUser({ password: passwordEl.value }).then(function (result) {
+                if (result.error) throw result.error;
+                return exchange(session.access_token);
+            }).catch(function (error) {
+                var message = (error && error.message) || '';
+                formAlert.textContent = /same.*password|different/i.test(message)
+                    ? 'That is already your password. Choose a different one.'
+                    : 'The password could not be saved: ' + (message ||
+                        'the link may have just expired. Ask the owner for a fresh one.');
+                formAlert.hidden = false;
+                busy(false);
+            });
+        });
+    });
+})();
+</script>
+{% endblock %}
