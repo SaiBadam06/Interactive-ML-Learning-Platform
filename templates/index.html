@@ -1,59 +1,40 @@
 {% extends "base.html" %}
 
-{% block title %}Home - ML Learning Assistant{% endblock %}
+{% block title %}GyanGuru{% endblock %}
 
 {% block content %}
-<div class="hero-section">
-    <div class="hero-content">
-        <h1 class="hero-title">
-            <i class="fas fa-brain"></i>
-            ML Learning Assistant
-        </h1>
-        <p class="hero-subtitle">
-            Master Machine Learning with AI-powered explanations, code examples, audio lessons, and visual diagrams!
-        </p>
-        <div class="quick-start" id="quickStart">
-            <label class="sr-only" for="quickTopic">Machine Learning Topic</label>
-            <input type="text" id="quickTopic" class="form-control"
-                   placeholder="What do you want to learn? e.g. Q-Learning">
-            <div class="quick-start-buttons">
-                <button type="button" class="btn btn-primary" data-path="/text-explanation">
-                    <i class="fas fa-book"></i> Explain
-                </button>
-                <button type="button" class="btn btn-primary" data-path="/code-generation">
-                    <i class="fas fa-code"></i> Code
-                </button>
-                <button type="button" class="btn btn-primary" data-path="/audio-learning">
-                    <i class="fas fa-headphones"></i> Audio
-                </button>
-                <button type="button" class="btn btn-primary" data-path="/image-visualization">
-                    <i class="fas fa-image"></i> Images
-                </button>
+<div class="container">
+    <section class="hero">
+        <h1>What do you want to understand today?</h1>
+
+        <div class="hero-form" id="quickStart">
+            <label class="sr-only" for="quickTopic">Machine learning topic</label>
+            <input type="text" id="quickTopic" class="form-control input-large"
+                   placeholder="e.g. Q-learning, backpropagation, k-means">
+            <div class="hero-buttons">
+                <button type="button" class="btn btn-primary" data-path="/text-explanation">Explain</button>
+                <button type="button" class="btn btn-outline" data-path="/code-generation">Code</button>
+                <button type="button" class="btn btn-outline" data-path="/audio-learning">Audio</button>
+                <button type="button" class="btn btn-outline" data-path="/image-visualization">Images</button>
             </div>
         </div>
+    </section>
 
-        <div class="hero-features">
-            <span class="hero-badge"><i class="fas fa-robot"></i> Powered by NVIDIA NIM</span>
-            <span class="hero-badge"><i class="fas fa-paint-brush"></i> FLUX.1-dev</span>
-            <span class="hero-badge"><i class="fas fa-rocket"></i> Interactive Learning</span>
-        </div>
-    </div>
-</div>
+    <section class="home-section">
+        <div class="chip-row recent-topics" id="recentTopics" data-target="/text-explanation" hidden></div>
+    </section>
 
-<div class="container">
-    <div class="recent-topics" id="recentTopics" data-target="/text-explanation" hidden></div>
-
-    <section class="suggested-section">
-        <h2 class="section-title">Suggested Topics</h2>
+    <section class="home-section">
+        <h2>Suggested topics</h2>
         {% for group, topics in [
-            ('Reinforcement Learning', ['Q-Learning', 'SARSA', 'Deep Q-Network', 'Policy Gradient',
+            ('Reinforcement learning', ['Q-Learning', 'SARSA', 'Deep Q-Network', 'Policy Gradient',
                                         'Bellman Equation', 'Markov Decision Process',
                                         'Epsilon-Greedy Exploration']),
-            ('Supervised Learning', ['Linear Regression', 'Logistic Regression', 'Decision Trees',
+            ('Supervised learning', ['Linear Regression', 'Logistic Regression', 'Decision Trees',
                                      'Random Forest', 'Support Vector Machines',
                                      'K-Nearest Neighbors']),
-            ('Unsupervised Learning', ['K-Means Clustering', 'PCA']),
-            ('Neural Networks', ['Gradient Descent', 'Backpropagation',
+            ('Unsupervised learning', ['K-Means Clustering', 'PCA']),
+            ('Neural networks', ['Gradient Descent', 'Backpropagation',
                                  'Convolutional Neural Networks'])
         ] %}
         <div class="suggested-group">
@@ -66,112 +47,6 @@
             </div>
         </div>
         {% endfor %}
-    </section>
-</div>
-
-<div class="container">
-    <section class="features-section">
-        <h2 class="section-title">Choose Your Learning Mode</h2>
-        
-        <div class="features-grid">
-            <!-- Text Explanation -->
-            <div class="feature-card">
-                <div class="feature-icon text-icon">
-                    <i class="fas fa-book"></i>
-                </div>
-                <h3>Text Explanations</h3>
-                <p>Get comprehensive text-based explanations of any ML topic with clear examples and structured learning paths.</p>
-                <ul class="feature-list">
-                    <li><i class="fas fa-check"></i> Clear explanations</li>
-                    <li><i class="fas fa-check"></i> Real-world examples</li>
-                    <li><i class="fas fa-check"></i> Structured content</li>
-                </ul>
-                <a href="{{ url_for('text_explanation') }}" class="btn btn-primary">
-                    <i class="fas fa-arrow-right"></i> Start Learning
-                </a>
-            </div>
-
-            <!-- Code Generation -->
-            <div class="feature-card">
-                <div class="feature-icon code-icon">
-                    <i class="fas fa-code"></i>
-                </div>
-                <h3>Code Examples</h3>
-                <p>Generate working Python code with detailed explanations. Run examples in Google Colab or your local environment.</p>
-                <ul class="feature-list">
-                    <li><i class="fas fa-check"></i> Working Python code</li>
-                    <li><i class="fas fa-check"></i> Detailed comments</li>
-                    <li><i class="fas fa-check"></i> Ready to execute</li>
-                </ul>
-                <a href="{{ url_for('code_generation') }}" class="btn btn-primary">
-                    <i class="fas fa-arrow-right"></i> Generate Code
-                </a>
-            </div>
-
-            <!-- Audio Learning -->
-            <div class="feature-card">
-                <div class="feature-icon audio-icon">
-                    <i class="fas fa-headphones"></i>
-                </div>
-                <h3>Audio Lessons</h3>
-                <p>Listen to audio explanations perfect for learning on the go. Download MP3 files for offline learning.</p>
-                <ul class="feature-list">
-                    <li><i class="fas fa-check"></i> Natural speech</li>
-                    <li><i class="fas fa-check"></i> Downloadable MP3</li>
-                    <li><i class="fas fa-check"></i> Learn anywhere</li>
-                </ul>
-                <a href="{{ url_for('audio_learning') }}" class="btn btn-primary">
-                    <i class="fas fa-arrow-right"></i> Listen Now
-                </a>
-            </div>
-
-            <!-- Image Visualization -->
-            <div class="feature-card">
-                <div class="feature-icon image-icon">
-                    <i class="fas fa-image"></i>
-                </div>
-                <h3>Visual Diagrams</h3>
-                <p>Generate AI-powered visual explanations and diagrams to understand complex ML concepts intuitively.</p>
-                <ul class="feature-list">
-                    <li><i class="fas fa-check"></i> AI-generated diagrams</li>
-                    <li><i class="fas fa-check"></i> Technical illustrations</li>
-                    <li><i class="fas fa-check"></i> Visual learning</li>
-                </ul>
-                <a href="{{ url_for('image_visualization') }}" class="btn btn-primary">
-                    <i class="fas fa-arrow-right"></i> Visualize Now
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <section class="info-section">
-        <div class="info-grid">
-            <div class="info-card">
-                <i class="fas fa-graduation-cap"></i>
-                <h3>Learn at Your Pace</h3>
-                <p>Choose between brief, detailed, or comprehensive explanations based on your learning needs.</p>
-            </div>
-            
-            <div class="info-card">
-                <i class="fas fa-lock"></i>
-                <h3>Secure & Private</h3>
-                <p>Your API keys are stored locally and never shared. All processing happens securely.</p>
-            </div>
-            
-            <div class="info-card">
-                <i class="fas fa-globe"></i>
-                <h3>Open Source</h3>
-                <p>Built with open-source technologies and available for the community to use and improve.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="cta-section">
-        <h2>Ready to Start Learning?</h2>
-        <p>Configure your API keys and begin your ML learning journey today!</p>
-        <a href="{{ url_for('settings') }}" class="btn btn-large btn-primary">
-            <i class="fas fa-cog"></i> Configure Settings
-        </a>
     </section>
 </div>
 {% endblock %}

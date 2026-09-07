@@ -3,80 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ML Learning Assistant{% endblock %}</title>
-    
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+    <title>{% block title %}GyanGuru{% endblock %}</title>
+
+    <!-- Theme is applied before first paint so the page never flashes light. -->
+    <script>
+        try {
+            var t = localStorage.getItem('theme');
+            if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        } catch (e) { /* private mode: fall back to prefers-color-scheme */ }
+    </script>
+
+    <!-- Fonts: one superfamily, IBM Plex Sans + Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
     <!-- Favicon (inline, avoids a 404 round-trip) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#129504;</text></svg>">
 
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous" referrerpolicy="no-referrer">
 
-    <!-- Python syntax highlighting -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" integrity="sha384-wFjoQjtV1y5jVHbt0p35Ui8aV8GVpEZkyF99OXWqP/eNJDU93D3Ugxkoyh6Y2I4A" crossorigin="anonymous" referrerpolicy="no-referrer">
-    
+    <!-- Prism's CDN theme is gone: syntax colours are token-driven in style.css
+         so the code reads as part of the page in both modes. Prism's JS stays. -->
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    
+
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
-            <div class="nav-brand">
-                <i class="fas fa-brain"></i>
-                <span>GyanGuru</span>
+            <a class="nav-brand" href="{{ url_for('index') }}">GyanGuru</a>
+
+            <div class="nav-actions">
+                <button class="btn-icon" id="themeToggle" type="button"
+                        aria-label="Switch theme" title="Switch theme">
+                    <i class="fas fa-circle-half-stroke" aria-hidden="true"></i>
+                </button>
+                <button class="nav-toggle" id="navToggle" type="button"
+                        aria-label="Open navigation menu" aria-expanded="false" aria-controls="navMenu">
+                    <i class="fas fa-bars" aria-hidden="true"></i>
+                </button>
             </div>
-            
-            <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="navMenu">
-                <i class="fas fa-bars"></i>
-            </button>
-            
+
             <ul class="nav-menu" id="navMenu">
-                <li><a href="{{ url_for('index') }}" class="nav-link"><i class="fas fa-home"></i> Home</a></li>
-                <li><a href="{{ url_for('text_explanation') }}" class="nav-link"><i class="fas fa-book"></i> Text</a></li>
-                <li><a href="{{ url_for('code_generation') }}" class="nav-link"><i class="fas fa-code"></i> Code</a></li>
-                <li><a href="{{ url_for('audio_learning') }}" class="nav-link"><i class="fas fa-headphones"></i> Audio</a></li>
-                <li><a href="{{ url_for('image_visualization') }}" class="nav-link"><i class="fas fa-image"></i> Images</a></li>
-                <li><a href="{{ url_for('practice') }}" class="nav-link"><i class="fas fa-circle-question"></i> Practice</a></li>
-                <li><a href="{{ url_for('settings') }}" class="nav-link"><i class="fas fa-cog"></i> Settings</a></li>
-                <li><a href="{{ url_for('about') }}" class="nav-link"><i class="fas fa-info-circle"></i> About</a></li>
+                {% for endpoint, label in [
+                    ('index', 'Home'), ('text_explanation', 'Text'), ('code_generation', 'Code'),
+                    ('audio_learning', 'Audio'), ('image_visualization', 'Images'),
+                    ('practice', 'Practice'), ('settings', 'Settings')
+                ] %}
+                <li><a href="{{ url_for(endpoint) }}" class="nav-link"
+                       {% if request.endpoint == endpoint %}aria-current="page"{% endif %}>{{ label }}</a></li>
+                {% endfor %}
+                <!-- auth:start -->
+                <!-- auth:end -->
             </ul>
         </div>
     </nav>
 
     <!-- Main Content -->
-    <main class="main-content">
+    <main class="main-content" id="main">
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
     <footer class="footer">
-        <div class="footer-container">
-            <div class="footer-content">
-                <p>&copy; 2025 ML Learning Assistant. Built with ❤️ using Flask & NVIDIA NIM</p>
-                <p class="footer-note">This tool is designed for educational purposes. Always verify information from multiple sources.</p>
-            </div>
-            <div class="footer-links">
-                <a href="https://github.com" target="_blank"><i class="fab fa-github"></i></a>
-                <a href="https://twitter.com" target="_blank"><i class="fab fa-twitter"></i></a>
-                <a href="https://linkedin.com" target="_blank"><i class="fab fa-linkedin"></i></a>
-            </div>
+        <div class="container">
+            <p>GyanGuru generates its lessons with a language model. Run the code and check it.</p>
         </div>
     </footer>
 
     <!-- Toast Notification -->
-    <div id="toast" class="toast"></div>
-
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="spinner"></div>
-        <p id="loadingMessage">Generating your personalized learning content...</p>
-        <p class="loading-elapsed" id="loadingElapsed"></p>
-    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js" integrity="sha384-MXybTpajaBV0AkcBaCPT4KIvo0FzoCiWXgcihYsw4FUkEz0Pv3JGV6tk2G8vJtDc" crossorigin="anonymous" referrerpolicy="no-referrer"></script>

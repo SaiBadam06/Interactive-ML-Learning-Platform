@@ -59,6 +59,22 @@ document.addEventListener('DOMContentLoaded', () => {
         codeContent.textContent = text;
         if (window.Prism) Prism.highlightElement(codeContent);
         renderGutter(text);
+        const meta = document.getElementById('resultsMeta');
+        if (meta) {
+            const level = document.getElementById('level');
+            const lines = text.replace(/\n$/, '').split('\n').length;
+            meta.textContent = (level ? level.value + ' · ' : '') + lines + ' lines';
+        }
+    }
+
+    // A run started in Program keeps streaming while another tab is open, so the
+    // tab itself has to say it is still going.
+    function setRunIndicator(on) {
+        const tab = document.getElementById('tab-program');
+        if (!tab) return;
+        const existing = tab.querySelector('.spinner');
+        if (on && !existing) tab.appendChild(Object.assign(document.createElement('span'), { className: 'spinner' }));
+        if (!on && existing) existing.remove();
     }
 
     function setStatus(text, kind) {
@@ -79,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
         runTimer = null;
         runBtn.disabled = false;
         stopBtn.style.display = 'none';
+        setRunIndicator(false);
     }
 
     // Killing the worker is the only way to stop Python: it cannot be
@@ -122,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setStatus('Starting...', 'busy');
             runBtn.disabled = true;
             stopBtn.style.display = '';
+            setRunIndicator(true);
             if (!worker) {
                 worker = new Worker(runBtn.dataset.worker, { type: 'module' });
                 worker.onmessage = onWorkerMessage;
@@ -143,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 codeEditor.style.height = Math.max(codeScroller.offsetHeight, 160) + 'px';
                 codeScroller.style.display = 'none';
                 codeEditor.style.display = 'block';
-                editBtn.innerHTML = '<i class="fas fa-check"></i> Done';
+                editBtn.textContent = 'Done';
                 editing = true;
                 codeEditor.focus();
             } else {
@@ -151,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setCode(codeEditor.value);
                 codeEditor.style.display = 'none';
                 codeScroller.style.display = '';
-                editBtn.innerHTML = '<i class="fas fa-pen"></i> Edit';
+                editBtn.textContent = 'Edit';
             }
         });
 
@@ -202,8 +220,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const ask = document.createElement('button');
             ask.type = 'button';
-            ask.className = 'btn btn-secondary code-section-ask';
-            ask.innerHTML = '<i class="fas fa-comments"></i> Ask about this section';
+            ask.className = 'btn btn-outline code-section-ask';
+            ask.textContent = 'Ask about this section';
             ask.addEventListener('click', () => {
                 const title = sec.title || `Part ${i + 1}`;
                 const range = sec.start_line ? ` (lines ${sec.start_line}-${sec.end_line})` : '';
@@ -213,10 +231,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             wrap.append(head, pre, why, ask);
+            // The one orchestrated moment: sections reveal top to bottom, once.
+            wrap.classList.add('reveal');
+            wrap.style.animationDelay = (i * 40) + 'ms';
             sectionsDiv.appendChild(wrap);
             if (window.Prism) Prism.highlightElement(codeEl);
         });
         sectionsCard.style.display = 'block';
+        // They arrive after the code, so say so on the tab that now holds them.
+        if (window.markTabNew) markTabNew('tab-walkthrough');
     }
 
     async function loadSections(code, topic) {
@@ -245,22 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Tab functionality
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tabName = btn.dataset.tab;
-            
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            
-            btn.classList.add('active');
-            document.getElementById(`${tabName}Tab`).classList.add('active');
-        });
-    });
-    
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -340,8 +347,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const copyBtn = document.createElement('button');
                     copyBtn.type = 'button';
-                    copyBtn.className = 'btn btn-secondary install-copy';
-                    copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+                    copyBtn.className = 'btn btn-outline install-copy';
+                    copyBtn.textContent = 'Copy';
                     copyBtn.addEventListener('click', () => copyToClipboard(installCmd));
 
                     row.append(code, copyBtn);
@@ -352,10 +359,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     dependenciesSection.style.display = 'none';
                 }
                 
-                outputSection.style.display = 'block';
+                const title = document.getElementById('resultsTitle');
+                if (title) title.textContent = topic;
+                outputSection.hidden = false;
                 outputSection.scrollIntoView({ behavior: 'smooth' });
                 rememberTopic(topic);
-                showToast('Code generated successfully!', 'success');
+                showToast('Your program is ready.', 'success');
             } else {
                 throw new Error('Failed to generate content');
             }
