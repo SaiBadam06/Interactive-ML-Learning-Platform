@@ -47,7 +47,7 @@
        pixel; changing one without the other breaks number alignment. */
     --code-line: 21.6px;
 
-    --measure: 68ch;
+    --measure: 76ch;
     color-scheme: light;
 }
 
@@ -130,14 +130,20 @@ kbd {
 
 /* ---------- 4. Layout ---------------------------------------------------- */
 
+/* A centred column, not full bleed.
+   Full bleed was tried and was wrong: a line of prose has to stay near 70
+   characters to be readable, so on a 1500px window the text hugged the left
+   edge and left half the screen empty. It cannot be filled by one column - the
+   fix is to centre it, which is what ChatGPT (640px), Claude (704px) and Gemini
+   (840px) all do on this same screen. The navbar still spans the window. */
 .container {
     width: 100%;
-    max-width: none;        /* full bleed: the page uses the whole window */
-    margin: 0;
+    max-width: 1120px;
+    margin-inline: auto;
     padding: 0 var(--s6);
 }
 
-.container-wide { max-width: none; }
+.container-wide { max-width: 1280px; }
 
 .main-content { padding: var(--s6) 0 var(--s8); flex: 1 0 auto; }
 
@@ -301,6 +307,20 @@ kbd {
 .btn-danger { background: var(--danger); color: #FFFFFF; }
 .btn-danger:hover { background: var(--danger); filter: brightness(1.08); }
 
+/* Both classes together means "destructive, but not shouting". A list of
+   accounts should not be dominated by solid red; that belongs on the confirm
+   button in the modal, where the decision is actually made. */
+.btn-outline.btn-danger {
+    background: var(--surface);
+    color: var(--danger);
+    border-color: var(--danger);
+}
+.btn-outline.btn-danger:hover {
+    background: var(--danger);
+    color: #FFFFFF;
+    filter: none;
+}
+
 .btn-large { min-height: 48px; padding: 0 var(--s5); font-size: 16px; }
 
 .btn-icon {
@@ -439,6 +459,7 @@ textarea.form-control { min-height: 96px; }
 .card-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
 
 .section-hint { color: var(--ink-muted); font-size: 15px; margin: 0 0 var(--s4); max-width: var(--measure); }
+.form-hint { max-width: var(--measure); }
 
 /* --- Results header --- */
 
@@ -543,8 +564,11 @@ textarea.form-control { min-height: 96px; }
     background: var(--surface-2);
     border: 1px solid var(--hairline);
     border-radius: var(--r-chip);
-    overflow: auto;
-    max-height: 62vh;
+    /* Sideways only. A vertical cap here made the listing a scroll trap: it
+       covered most of the screen, so a wheel anywhere over the program was
+       swallowed by the block instead of scrolling the page. The listing is the
+       thing being read - let it be as tall as it is and let the page move. */
+    overflow-x: auto;
 }
 
 .code-gutter {
@@ -640,7 +664,9 @@ textarea.form-control { min-height: 96px; }
     font-size: 14px;
     line-height: 1.55;
     white-space: pre-wrap;
-    max-height: 40vh;
+    /* Program output can be thousands of lines, so this one keeps a cap - but a
+       small one, so it is a modest target rather than half the screen. */
+    max-height: 22rem;
     overflow: auto;
 }
 .run-err { color: var(--danger); }
@@ -1172,8 +1198,8 @@ textarea.form-control { min-height: 96px; }
        content and centre it - which put the switch in the middle of the page.
        An explicit width makes it span, so flex-end is a real right edge. */
     width: 100%;
-    max-width: none;           /* tracks the full-bleed container */
-    margin: 0;
+    max-width: 1280px;         /* tracks .container-wide */
+    margin-inline: auto;
     padding: 0 var(--s6);
     height: 0;                 /* takes no vertical space in the flow */
     pointer-events: none;      /* only the button is clickable */
@@ -1412,6 +1438,15 @@ textarea.form-control { min-height: 96px; }
 
 :root[data-theme="dark"] .btn-danger,
 :root:not([data-theme="light"]) .btn-danger { color: #1B1F24; }
+
+/* In dark mode --danger is a light red, so a solid danger button needs dark
+   text - and that rule is more specific than the outline variant, which left
+   the outline button with near-black text on a near-black surface. It has to
+   be restated here at the same specificity to win it back. */
+:root[data-theme="dark"] .btn-outline.btn-danger,
+:root:not([data-theme="light"]) .btn-outline.btn-danger { color: var(--danger); }
+:root[data-theme="dark"] .btn-outline.btn-danger:hover,
+:root:not([data-theme="light"]) .btn-outline.btn-danger:hover { color: #1B1F24; }
 
 /* ---------- 10. Reduced motion ------------------------------------------- */
 
@@ -1755,4 +1790,91 @@ body:has(.chat-page) .chat-thread { padding-top: 46px; }
     width: 5.5rem;
     padding: var(--s2) var(--s3);
     font-variant-numeric: tabular-nums;
+}
+
+/* --- Chat: the reading column and rendered markdown ---------------------- */
+/* Measured against ChatGPT on a 1536px screen: its answer column is 640px, not
+   the width of the window. Ours ran the full 1500px, which is most of why a
+   long answer read as a wall. One column, centred, for turns and composer
+   alike, so the eye returns to the same left edge every line. */
+
+.chat-turn,
+.chat-composer > .chat-box,
+.chat-hint {
+    max-width: 48rem;
+    margin-inline: auto;
+}
+.chat-turn-assistant,
+.chat-turn-user { max-width: 48rem; }
+
+/* Code and diagrams may break out; sentences may not. */
+.chat-prose { max-width: none; }
+.chat-prose > p,
+.chat-prose > ul,
+.chat-prose > ol,
+.chat-prose > h3,
+.chat-prose > h4,
+.chat-prose > h5 { max-width: var(--measure); }
+
+.chat-prose > * + * { margin-top: var(--s3); }
+.chat-prose > h3,
+.chat-prose > h4,
+.chat-prose > h5 { margin-top: var(--s5); margin-bottom: 0; line-height: 1.35; }
+.chat-prose > :first-child { margin-top: 0; }
+.chat-prose h3 { font-size: 1.15rem; }
+.chat-prose h4 { font-size: 1.05rem; }
+.chat-prose h5 { font-size: 1rem; }
+
+.chat-prose ul,
+.chat-prose ol { padding-left: 1.35em; }
+.chat-prose li + li { margin-top: var(--s2); }
+.chat-prose li::marker { color: var(--ink-muted); }
+
+/* An identifier set in the same face as the sentence around it is the single
+   biggest reason a technical answer reads as mush. */
+.chat-prose code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    padding: 1px 5px;
+    border-radius: var(--r-chip);
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    overflow-wrap: anywhere;
+}
+.chat-prose strong { font-weight: 600; color: var(--ink); }
+
+/* A fenced block inside the prose. The extracted program gets the real gutter
+   treatment; this is for snippets the answer quotes in passing. */
+.chat-code {
+    margin: var(--s4) 0;
+    padding: var(--s3) var(--s4);
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-chip);
+    overflow-x: auto;
+    font-size: 14px;
+    line-height: 1.55;
+}
+.chat-code code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+/* --- Tap targets --------------------------------------------------------- */
+/* A 13px checkbox is hard to hit with a thumb. These are the two controls the
+   audit found under the size a finger can reliably land on. */
+
+.nav-brand { min-height: 44px; }
+
+input[type="checkbox"],
+input[type="radio"]:not(.segmented-item input) {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+}
+
+/* The label is the real target: clicking the words toggles the box, so give
+   the pair enough height to hit without aiming. */
+label.form-hint:has(input[type="checkbox"]) {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    min-height: 44px;
 }

@@ -43,6 +43,110 @@
     let frame = 0;                             // pending rAF id
     let lastTopic = '';
 
+
+    // ===== Markdown for chat answers =====
+    // The shared formatMarkdown() renders plain text, because the page-based
+    // flows tell the model not to use markdown. The chat asks for it, so it
+    // needs a renderer: without one, an answer naming a dozen functions arrives
+    // as one wall of prose with `np.vstack` set in the same face as the words
+    // around it.
+    //
+    // Safety: the whole string is escaped FIRST, then structure is added to the
+    // escaped text. Model output can therefore never introduce a tag - by the
+    // time any pattern is matched, every < is already &lt;.
+    function esc(text) {
+        return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;',
+                     '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    // Inline marks, applied to already-escaped text.
+    function inline(text) {
+        return text
+            // Code first: whatever is inside must not then be read as bold.
+            .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+            .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+            // Bold only. Single-asterisk italics are deliberately unsupported:
+            // in this subject "2 * 3 * 4" and "loss = w * x + b" are far more
+            // common than emphasis, and both were rendering as italics.
+            ;
+    }
+
+    function renderMarkdown(source) {
+        const lines = esc(source).split('\n');
+        const out = [];
+        let paragraph = [];
+        let list = null;                       // 'ul' | 'ol' | null
+        let fence = null;                      // collected code lines, or null
+
+        const closeParagraph = function () {
+            if (paragraph.length) {
+                out.push('<p>' + inline(paragraph.join(' ')) + '</p>');
+                paragraph = [];
+            }
+        };
+        const closeList = function () {
+            if (list) { out.push('</' + list + '>'); list = null; }
+        };
+        const openList = function (kind) {
+            if (list !== kind) { closeList(); out.push('<' + kind + '>'); list = kind; }
+        };
+
+        lines.forEach(function (line) {
+            // Fenced code. The opening fence may carry a language, which is
+            // dropped: highlighting happens on the extracted program instead.
+            const fenceEdge = /^\s*```/.test(line);
+            if (fenceEdge) {
+                if (fence === null) { closeParagraph(); closeList(); fence = []; }
+                else {
+                    out.push('<pre class="chat-code"><code>' + fence.join('\n') + '</code></pre>');
+                    fence = null;
+                }
+                return;
+            }
+            if (fence !== null) { fence.push(line); return; }
+
+            const trimmed = line.trim();
+            if (!trimmed) { closeParagraph(); closeList(); return; }
+
+            const heading = trimmed.match(/^(#{1,4})\s+(.*)$/);
+            if (heading) {
+                closeParagraph(); closeList();
+                // Never above h3: these sit inside a page that already has an h1.
+                const level = Math.min(heading[1].length + 2, 5);
+                out.push('<h' + level + '>' + inline(heading[2]) + '</h' + level + '>');
+                return;
+            }
+
+            const bullet = trimmed.match(/^[-*+]\s+(.*)$/);
+            if (bullet) {
+                closeParagraph(); openList('ul');
+                out.push('<li>' + inline(bullet[1]) + '</li>');
+                return;
+            }
+
+            const numbered = trimmed.match(/^\d+[.)]\s+(.*)$/);
+            if (numbered) {
+                closeParagraph(); openList('ol');
+                out.push('<li>' + inline(numbered[1]) + '</li>');
+                return;
+            }
+
+            closeList();
+            paragraph.push(trimmed);
+        });
+
+        // A reply still streaming ends mid-fence; show what has arrived rather
+        // than dropping it.
+        if (fence !== null && fence.length) {
+            out.push('<pre class="chat-code"><code>' + fence.join('\n') + '</code></pre>');
+        }
+        closeParagraph();
+        closeList();
+        return out.join('');
+    }
+
     // ---------- storage -------------------------------------------------
 
     function pref(key, allowed, fallback) {
@@ -368,7 +472,7 @@
         frame = 0;
         if (!live) return;
         if (live.proseDirty) {
-            live.view.prose.innerHTML = window.formatMarkdown(live.text);
+            live.view.prose.innerHTML = renderMarkdown(live.text);
             live.proseDirty = false;
         }
         if (stick) scrollToEnd();
@@ -455,7 +559,7 @@
         // as running paragraphs.
         if (done && done.code) text = text.replace(/```[\w+.-]*\r?\n?[\s\S]*?```/g, '').trim();
 
-        view.prose.innerHTML = text ? window.formatMarkdown(text) : '';
+        view.prose.innerHTML = text ? renderMarkdown(text) : '';
         view.turn.classList.remove('is-streaming');
         view.status.hidden = true;
         view.think.hidden = true;               // nothing is being thought about now
@@ -624,7 +728,7 @@
             } else {
                 const view = addAssistantTurn();
                 view.think.remove();           // a scratchpad is not worth keeping
-                view.prose.innerHTML = window.formatMarkdown(m.content);
+                view.prose.innerHTML = renderMarkdown(m.content);
                 addActions(view, m.content);
             }
         });

@@ -40,14 +40,19 @@
     <nav class="navbar">
         <div class="nav-container">
             <a class="nav-brand" href="{{ url_for('index') }}">
-                {# A monogram: one shape, no metaphor, legible at any size. #}
+                {# Two G's for GyanGuru, interlocked. Four arrangements were drawn and
+                   compared at 16px before this one. #}
                 <svg class="nav-logo" viewBox="0 0 32 32" role="img" aria-label="" focusable="false">
                     <rect width="32" height="32" rx="8" fill="currentColor"/>
-                    <!-- A G cut from a ring. Three metaphor marks were tried and
-                         rejected before this; a letterform has nothing to
-                         misread and holds its shape down to 16px. -->
-                    <path d="M21.5 11.5a7 7 0 1 0 .5 6H16" fill="none"
-                          stroke="var(--accent-ink)" stroke-width="2.8" stroke-linecap="round"/>
+                    <!-- Two G's, for Gyan and Guru, interlocked so they read as one
+                         mark rather than two letters that happen to be adjacent.
+                         The gold one sits behind; drawn first so it does. -->
+                    <path d="M17.5 11.6a5.2 5.2 0 1 0 .4 4.6h-3" fill="none"
+                          stroke="var(--marker)" stroke-width="2.4" stroke-linecap="round"
+                          transform="translate(4.6 0)"/>
+                    <path d="M17.5 11.6a5.2 5.2 0 1 0 .4 4.6h-3" fill="none"
+                          stroke="var(--accent-ink)" stroke-width="2.4" stroke-linecap="round"
+                          transform="translate(-2.4 0)"/>
                 </svg>
                 <span>GyanGuru</span>
             </a>

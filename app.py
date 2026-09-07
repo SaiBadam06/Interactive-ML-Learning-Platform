@@ -861,9 +861,17 @@ CHAT_SYSTEM = (
     "{scope}"
     "{audience}{wording}"
     "Rules for every reply:\n"
-    "- Plain text. No markdown symbols, no bold, no headings with #.\n"
-    "- The one exception is a ```python code fence, which you MUST use whenever "
-    "you show code.\n"
+    # The page-based flows forbid markdown because they render plain text. The
+    # chat renders it, and without it an answer that names half a dozen
+    # functions arrives as one undifferentiated wall.
+    "- Use markdown, and use it to make the answer easier to scan:\n"
+    "  `backticks` around every identifier, function, argument and file name;\n"
+    "  **bold** for a term you are defining, once, where you define it;\n"
+    "  bullets starting with - when you list more than two things;\n"
+    "  ### short headings only when the answer has genuinely separate parts.\n"
+    "- Put runnable code in a ```python fence, never inline.\n"
+    "- Keep paragraphs to three or four sentences with a blank line between "
+    "them. A wall of text is the thing to avoid.\n"
     "- Answer the question actually asked. Do not restate the whole topic when "
     "the learner asks about one part of it.\n"
     "- If you are asked to simplify, say the same thing in easier words. Do not "
