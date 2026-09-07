@@ -593,3 +593,58 @@ After the written explanation, output 2-3 image prompts. Each one must start on 
 
     logger.error(f"All models failed for mode '{mode}'")
     return None
+
+
+# ============================== Streaming ==============================
+# The chat surface lives or dies on time-to-first-word. A non-streaming call
+# leaves a spinner up for 15-90 s; streaming puts words on screen in about a
+# second, which is the whole reason the chat interface is worth having.
+
+def stream_chat(api_key, messages, model=None, max_tokens=4096, temperature=0.7):
+    """Yield ("thinking" | "content", text) as the model produces it.
+
+    Two things are deliberate here:
+
+    * ``chat_template_kwargs={"thinking": False}`` is NOT sent. It works for a
+      normal call, but on the streaming endpoint it suppresses the answer
+      entirely - measured: 1926 characters of reasoning and zero of content.
+      The scratchpad is separated here instead, and the caller decides whether
+      to show it.
+    * Reasoning arrives as ``delta.reasoning_content`` and the answer as
+      ``delta.content``. They are kept apart so the scratchpad can never be
+      mistaken for the lesson.
+    """
+    model = model or NIM_TEXT_MODEL
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": True,
+    }
+    response = requests.post(
+        NIM_CHAT_URL,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json=payload, stream=True, timeout=(10, 180),
+    )
+    if response.status_code != 200:
+        logger.error("stream_chat %s failed: HTTP %s", model, response.status_code)
+        raise RuntimeError(f"model returned {response.status_code}")
+
+    for raw in response.iter_lines():
+        if not raw:
+            continue
+        line = raw.decode("utf-8", "replace")
+        if not line.startswith("data: "):
+            continue
+        body = line[6:].strip()
+        if body == "[DONE]":
+            break
+        try:
+            delta = ((json.loads(body).get("choices") or [{}])[0].get("delta") or {})
+        except (ValueError, IndexError, AttributeError):
+            continue                       # a malformed frame is not fatal
+        if delta.get("reasoning_content"):
+            yield "thinking", delta["reasoning_content"]
+        if delta.get("content"):
+            yield "content", delta["content"]

@@ -232,6 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     initWording();
+    initToolsMenu();
 
     // Home hero: one topic box, four destinations.
     const quickTopic = document.getElementById('quickTopic');
@@ -792,6 +793,49 @@ function initWording() {
         radio.addEventListener('change', () => {
             if (radio.checked) setWordingPref(radio.value);
         });
+    });
+}
+
+
+// ===== Nav: Tools menu =====
+// A real disclosure: it closes on Escape, on a click elsewhere, and when focus
+// leaves it, so it cannot be left hanging open over the page.
+function initToolsMenu() {
+    const button = document.getElementById('toolsToggle');
+    const menu = document.getElementById('toolsMenu');
+    if (!button || !menu) return;
+
+    const setOpen = open => {
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        menu.hidden = !open;
+    };
+
+    button.addEventListener('click', event => {
+        event.stopPropagation();
+        setOpen(menu.hidden);
+    });
+
+    menu.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { setOpen(false); button.focus(); }
+    });
+    button.addEventListener('keydown', event => {
+        if (event.key === 'Escape') setOpen(false);
+        // Down-arrow from the button moves into the menu, as a menu should.
+        if (event.key === 'ArrowDown' && !menu.hidden) {
+            const first = menu.querySelector('a');
+            if (first) { event.preventDefault(); first.focus(); }
+        }
+    });
+
+    document.addEventListener('click', event => {
+        if (!menu.hidden && !menu.contains(event.target) && event.target !== button) {
+            setOpen(false);
+        }
+    });
+    document.addEventListener('focusin', event => {
+        if (!menu.hidden && !menu.contains(event.target) && event.target !== button) {
+            setOpen(false);
+        }
     });
 }
 

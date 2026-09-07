@@ -1,4 +1,6 @@
-from flask import Flask, render_template, request, jsonify, session, send_file, redirect, url_for
+from flask import (Flask, render_template, request, jsonify, session, send_file,
+                   redirect, url_for, Response)
+import json
 import os
 import logging
 from datetime import timedelta
@@ -10,7 +12,9 @@ import base64
 import tempfile
 
 # Import utility modules
-from utils.genai_utils import call_genai, call_followup, explain_code_sections, generate_quiz
+from utils.genai_utils import (call_genai, call_followup, explain_code_sections,
+                               generate_quiz, stream_chat, AUDIENCE, WORDING,
+                               _extract_code, NIM_TEXT_MODEL, NIM_CODE_MODEL)
 from utils.audio_utils import text_to_audio
 from utils.code_executor import detect_dependencies, save_code_to_file
 from utils.image_utils import generate_images, get_model_info
@@ -741,6 +745,179 @@ def model_info():
     except Exception as e:
         logger.error(f"Error in model_info: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+# ===================== Chat =====================
+# One conversational surface. Everything the separate pages do is reachable by
+# asking, and a follow-up is the next message rather than a different box
+# further down the page.
+#
+# Every mode streams its text first, so words appear in about a second instead
+# of after a 15-90 s spinner. Audio and images then produce their artifact from
+# that same text and send it as a final event - the learner is already reading
+# while the file is being made.
+
+VALID_MODES = {'explain', 'code', 'audio', 'images'}
+
+CHAT_SYSTEM = (
+    "You are a patient tutor for machine learning and computer science.\n"
+    "{audience}{wording}"
+    "Rules for every reply:\n"
+    "- Plain text. No markdown symbols, no bold, no headings with #.\n"
+    "- The one exception is a ```python code fence, which you MUST use whenever "
+    "you show code.\n"
+    "- Answer the question actually asked. Do not restate the whole topic when "
+    "the learner asks about one part of it.\n"
+    "- If you are asked to simplify, say the same thing in easier words. Do not "
+    "add new material and do not skip any of it.\n"
+)
+
+MODE_SYSTEM = {
+    'code': (
+        "\nThe learner asked for a program. Write one complete, runnable Python "
+        "program in a single ```python fence. It must run end to end with no edits "
+        "and print its results. Comment the parts that carry the idea. After the "
+        "fence, explain in a few sentences what the program does.\n"
+    ),
+    'audio': (
+        "\nThe learner wants to listen to this rather than read it. Write it as "
+        "something spoken aloud: full sentences, no lists, no code, and no symbols "
+        "a voice cannot say. Never write stage directions such as [pause]. Aim for "
+        "about 250 words.\n"
+    ),
+    'images': (
+        "\nThe learner wants a picture of this. First explain the idea in a few "
+        "sentences. Then, on their own lines at the very end, write exactly three "
+        "descriptions of diagrams that would make it clearer, each line starting "
+        "with 'DIAGRAM: ' and describing only boxes, arrows and labels.\n"
+    ),
+}
+
+# Which quota bucket each mode spends.
+MODE_QUOTA = {'explain': 'text', 'code': 'code', 'audio': 'audio', 'images': 'images'}
+
+
+def _sse(event):
+    """One server-sent event."""
+    return "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
+
+
+@app.route('/chat')
+def chat_page():
+    return render_template('chat.html')
+
+
+@app.route('/api/chat', methods=['POST'])
+def api_chat():
+    """Stream a reply as server-sent events.
+
+    Auth, quota and every value the generator needs are resolved here, while the
+    request context still exists. The generator body runs after Flask has torn
+    that context down, so reading `request` or `session` inside it would fail.
+    """
+    data = request.get_json(silent=True) or {}
+    api_key = str(data.get('api_key') or '').strip() or os.getenv('NVIDIA_API_KEY', '').strip()
+    if not api_key:
+        return jsonify({'error': 'API key is required'}), 400
+
+    mode = data.get('mode') if data.get('mode') in VALID_MODES else 'explain'
+    level = data.get('level') if data.get('level') in VALID_LEVELS else 'Beginner'
+    wording = data.get('wording') if data.get('wording') in VALID_WORDINGS else 'Standard'
+
+    history = data.get('messages') if isinstance(data.get('messages'), list) else []
+    turns = [{'role': m['role'], 'content': str(m['content'])[:6000]}
+             for m in history[-12:]
+             if isinstance(m, dict) and m.get('role') in ('user', 'assistant')
+             and str(m.get('content') or '').strip()]
+    if not turns or turns[-1]['role'] != 'user':
+        return jsonify({'error': 'The last message must be yours.'}), 400
+    topic = turns[-1]['content'][:120]
+
+    over_quota = spend_quota(MODE_QUOTA[mode])
+    if over_quota:
+        return over_quota
+
+    system = CHAT_SYSTEM.format(audience=AUDIENCE.get(level, AUDIENCE['Beginner']),
+                                wording=WORDING.get(wording, ''))
+    system += MODE_SYSTEM.get(mode, '')
+    messages = [{'role': 'system', 'content': system}] + turns
+    # muse-glimmer everywhere, including prose, which the page-based flows do not
+    # do. Measured on this endpoint: muse puts its first word on screen at 4.2 s,
+    # nemotron at 17.3 s. Nemotron writes better prose, but seventeen seconds of
+    # silence in a chat reads as broken, and the learner can always ask again.
+    model = NIM_CODE_MODEL
+
+    def events():
+        answer = []
+        try:
+            for kind, piece in stream_chat(api_key, messages, model=model):
+                if kind == 'thinking':
+                    yield _sse({'type': 'thinking', 'text': piece})
+                else:
+                    answer.append(piece)
+                    yield _sse({'type': 'content', 'text': piece})
+        except Exception as exc:                    # network, HTTP, malformed stream
+            logger.error("chat stream failed: %s", exc)
+            yield _sse({'type': 'error',
+                        'error': 'The model stopped part way. Ask again in a moment.'})
+            return
+
+        text = ''.join(answer).strip()
+        if not text:
+            yield _sse({'type': 'error',
+                        'error': 'The model returned nothing. Ask again in a moment.'})
+            return
+
+        done = {'type': 'done'}
+
+        if mode == 'code':
+            # _extract_code returns (program, prose_without_the_fence). Sending
+            # both lets the page swap the raw fence it streamed for a real code
+            # block with Copy and Download, the way a chat app renders code.
+            if '```' in text:
+                program, prose = _extract_code(text)
+                done['code'] = program or None
+                done['prose'] = prose if program else None
+            else:
+                done['code'] = None
+
+        elif mode == 'audio':
+            yield _sse({'type': 'working', 'label': 'Recording it'})
+            try:
+                filename = text_to_audio(text, topic or 'lesson')
+                if filename:
+                    done['audio'] = url_for('download_audio', filename=filename)
+                    done['audio_name'] = filename
+                else:
+                    done['note'] = 'The audio could not be recorded, but the script is above.'
+            except Exception:
+                logger.warning("chat audio failed", exc_info=True)
+                done['note'] = 'The audio could not be recorded, but the script is above.'
+
+        elif mode == 'images':
+            prompts = [line.split('DIAGRAM:', 1)[1].strip()
+                       for line in text.splitlines() if 'DIAGRAM:' in line][:3]
+            if prompts:
+                yield _sse({'type': 'working',
+                            'label': 'Drawing %d diagram%s' % (len(prompts),
+                                                               '' if len(prompts) == 1 else 's')})
+                try:
+                    done['images'] = generate_images(prompts, api_key, topic) or []
+                    done['prompts'] = prompts
+                except Exception:
+                    logger.warning("chat images failed", exc_info=True)
+                    done['note'] = 'The diagrams could not be drawn, but the explanation is above.'
+            else:
+                done['note'] = 'No diagrams were suggested for this one.'
+
+        yield _sse(done)
+
+    return Response(events(), mimetype='text/event-stream', headers={
+        'Cache-Control': 'no-cache, no-transform',
+        'X-Accel-Buffering': 'no',                  # stop a proxy buffering the stream
+        'Connection': 'keep-alive',
+    })
+
 
 @app.route('/api/download-code/<filename>')
 def download_code(filename):
