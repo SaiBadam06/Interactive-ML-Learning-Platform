@@ -1746,3 +1746,13 @@ body:has(.chat-page) .chat-thread { padding-top: 46px; }
     font-size: 15px;
     font-variant-numeric: tabular-nums;   /* the seconds must not jitter */
 }
+
+/* --- Admin: per-account limit controls ----------------------------------- */
+
+.user-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); }
+
+.user-limit {
+    width: 5.5rem;
+    padding: var(--s2) var(--s3);
+    font-variant-numeric: tabular-nums;
+}

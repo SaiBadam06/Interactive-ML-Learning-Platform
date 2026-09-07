@@ -618,13 +618,19 @@ function initTabs(root) {
             // adjustment below. Move the caret without moving the page.
             tab.focus({ preventScroll: true });
             // Panels differ in height by hundreds of pixels, so switching from
-            // a long one to a short one used to leave the reader parked below
-            // where the content now ends - the page looked empty or jumped.
-            // Put the strip back under the navbar so every switch lands in the
-            // same place.
+            // a long one to a short one can leave the reader parked below where
+            // the content now ends, staring at nothing.
+            //
+            // Only correct that when the strip is genuinely unusable: hidden
+            // under the sticky navbar, or off the bottom of the screen. An
+            // earlier version moved the page whenever the strip sat below the
+            // middle of the viewport, which meant a click that should have
+            // changed nothing visible yanked the page instead.
             const top = list.getBoundingClientRect().top;
-            if (top < TAB_STRIP_TOP || top > window.innerHeight * 0.6) {
-                list.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            if (top < TAB_STRIP_TOP || top > window.innerHeight - 80) {
+                // Instant, not smooth: a glide on every tab click reads as the
+                // page moving on its own.
+                list.scrollIntoView({ block: 'start', behavior: 'auto' });
             }
         }
         if (hash) {

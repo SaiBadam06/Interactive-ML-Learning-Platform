@@ -84,7 +84,8 @@
                There is no analytics, no advertising and no third-party tracking.</p>
         </div>
 
-        {# 6. Setup #}
+        {# 6. Setup - deployment detail, so only whoever runs the deployment. #}
+        {% if account_is_admin %}
         <div class="card">
             <h2>Setup</h2>
             <p>Self-hosting? These are the environment variables read from <code>.env</code>.</p>
@@ -95,8 +96,10 @@
                 <li>SUPABASE_URL, SUPABASE_ANON_KEY <span class="muted">— login and saved lessons</span></li>
                 <li>SUPABASE_SERVICE_ROLE_KEY <span class="muted">— server only, for the admin invite page</span></li>
                 <li>ADMIN_EMAILS, SITE_URL <span class="muted">— who may invite, and where invite links point</span></li>
+                <li>DAILY_GENERATION_LIMIT <span class="muted">— the default daily allowance, per account</span></li>
             </ul>
         </div>
+        {% endif %}
 
         {# 7. About - folded in from the old /about page, which now redirects here. #}
         <div class="card">

@@ -305,16 +305,32 @@ def admin_users():
                 error = 'unavailable'
         except (requests.RequestException, ValueError):
             error = 'unavailable'
-    rows = [{
-        'id': u.get('id'),
-        'email': (u.get('email') or '').lower(),
-        'created_at': (u.get('created_at') or '')[:10],
-        'last_sign_in_at': (u.get('last_sign_in_at') or '')[:10],
-        'pending': not u.get('last_sign_in_at'),
-        'is_admin': auth.is_admin(u.get('email')),
-    } for u in users if u.get('id')]
+    default_limit = quota.daily_limit()
+    rows = []
+    for u in users:
+        if not u.get('id'):
+            continue
+        # The override rides along in the listing, so showing it costs no extra
+        # request per account.
+        override = ((u.get('app_metadata') or {}).get(quota.META_KEY))
+        try:
+            override = int(override) if override is not None else None
+        except (TypeError, ValueError):
+            override = None
+        rows.append({
+            'id': u.get('id'),
+            'email': (u.get('email') or '').lower(),
+            'created_at': (u.get('created_at') or '')[:10],
+            'last_sign_in_at': (u.get('last_sign_in_at') or '')[:10],
+            'pending': not u.get('last_sign_in_at'),
+            'is_admin': auth.is_admin(u.get('email')),
+            'limit': override if override is not None else default_limit,
+            'custom_limit': override is not None,
+            'used': quota.used_today(u.get('id')) or 0,
+        })
     return render_template('admin_users.html', users=rows, error=error, page=page,
                            has_next=len(rows) >= 100,
+                           default_limit=default_limit,
                            app_config=app_config())
 
 
@@ -444,6 +460,68 @@ def admin_delete_user():
     auth.forget_user(user_id)
     logger.info("admin %s deleted user %s (%s)", admin['email'], target, user_id)
     return jsonify({'ok': True, 'email': target})
+
+
+@app.route('/admin/users/limit', methods=['POST'])
+@auth.admin_required
+def admin_set_limit():
+    """Give one account its own daily allowance, or put it back on the default.
+
+    Same order of refusals as the delete path: CSRF, configuration, the shape of
+    the input, then the account itself.
+    """
+    if not auth.csrf_ok():
+        return jsonify({'error': 'Invalid request. Please reload the page.'}), 400
+    if not auth.invites_enabled():
+        return jsonify({'error': 'Account management is not configured.'}), 503
+
+    body = request.get_json(silent=True) or {}
+    user_id = str(body.get('user_id') or '').strip()
+    if not auth.valid_uuid(user_id):
+        return jsonify({'error': 'That is not a valid account id.'}), 400
+
+    raw = body.get('limit')
+    if raw in (None, '', 'default'):
+        limit = None                              # back to the deployment default
+    else:
+        try:
+            limit = int(raw)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'The limit has to be a whole number.'}), 400
+        if limit < 0:
+            return jsonify({'error': 'The limit cannot be negative.'}), 400
+        if limit > 10000:
+            return jsonify({'error': 'That is higher than the API could serve. '
+                                     'Use 0 for unlimited instead.'}), 400
+
+    if not quota.set_limit(user_id, limit):
+        return jsonify({'error': 'Could not reach the account service. '
+                                 'Nothing was changed.'}), 502
+    logger.info("admin %s set the daily limit for %s to %s",
+                auth.current_user()['email'], user_id, limit if limit is not None else 'default')
+    return jsonify({'ok': True, 'limit': limit, 'effective': quota.limit_for(user_id)})
+
+
+@app.route('/admin/users/reset-usage', methods=['POST'])
+@auth.admin_required
+def admin_reset_usage():
+    """Clear an account's usage for the current window, so it starts again."""
+    if not auth.csrf_ok():
+        return jsonify({'error': 'Invalid request. Please reload the page.'}), 400
+    if not auth.invites_enabled():
+        return jsonify({'error': 'Account management is not configured.'}), 503
+
+    body = request.get_json(silent=True) or {}
+    user_id = str(body.get('user_id') or '').strip()
+    if not auth.valid_uuid(user_id):
+        return jsonify({'error': 'That is not a valid account id.'}), 400
+
+    if not quota.reset_usage(user_id):
+        return jsonify({'error': 'Could not reach the account service. '
+                                 'Nothing was changed.'}), 502
+    logger.info("admin %s reset today's usage for %s", auth.current_user()['email'], user_id)
+    return jsonify({'ok': True, 'used': quota.used_today(user_id) or 0})
+
 
 
 def _remaining_admins(target):

@@ -86,6 +86,8 @@
                 <p class="section-hint">
                     "Pending" means the invite link has not been opened yet. Deleting an account
                     also deletes that person's saved lessons and quiz results.
+                    The limit is generations per rolling 24 hours; <strong>0 means no limit</strong>.
+                    Everyone starts on the deployment default of {{ default_limit }}.
                 </p>
 
                 <div id="userList">
@@ -100,14 +102,31 @@
                             <div class="user-meta">
                                 Added {{ u.created_at or 'unknown' }}{% if u.last_sign_in_at %} &middot; last signed in {{ u.last_sign_in_at }}{% endif %}
                             </div>
+                            <div class="user-meta" data-usage="{{ u.id }}">
+                                {{ u.used }} of
+                                {% if u.limit == 0 %}unlimited{% else %}{{ u.limit }}{% endif %}
+                                today{% if u.custom_limit %} &middot; own limit{% endif %}
+                            </div>
                         </div>
 
-                        {% if account and u.email == account.email %}
-                            <span class="user-meta">This is you</span>
-                        {% else %}
-                            <button type="button" class="btn btn-outline btn-danger delete-user"
-                                    data-id="{{ u.id }}" data-email="{{ u.email }}">Delete</button>
-                        {% endif %}
+                        <div class="user-controls">
+                            <label class="sr-only" for="limit-{{ u.id }}">Daily limit for {{ u.email }}</label>
+                            <input type="number" class="form-control user-limit" id="limit-{{ u.id }}"
+                                   min="0" max="10000" step="1" inputmode="numeric"
+                                   value="{{ u.limit }}" data-id="{{ u.id }}"
+                                   data-default="{{ default_limit }}"
+                                   title="0 means no limit at all">
+                            <button type="button" class="btn btn-outline save-limit"
+                                    data-id="{{ u.id }}">Save limit</button>
+                            <button type="button" class="btn btn-quiet reset-usage"
+                                    data-id="{{ u.id }}">Reset today</button>
+                            {% if account and u.email == account.email %}
+                                <span class="user-meta">This is you</span>
+                            {% else %}
+                                <button type="button" class="btn btn-outline btn-danger delete-user"
+                                        data-id="{{ u.id }}" data-email="{{ u.email }}">Delete</button>
+                            {% endif %}
+                        </div>
                     </div>
                 {% endfor %}
                 </div>
@@ -275,6 +294,58 @@
             try { document.execCommand('copy'); done(); }
             catch (e) { target.textContent = 'Press Ctrl+C'; }
         }
+    });
+
+
+    // ------------------------------------------------------------- limits
+    // The limit is generations per rolling 24 hours. 0 means no limit, which is
+    // why the field is not simply "blank = default": blank and zero would look
+    // the same and mean opposite things.
+    function busyWhile(button, label, work) {
+        const original = button.textContent;
+        button.disabled = true;
+        button.textContent = label;
+        work().then(function () { say('', ''); }, function (error) {
+            say(error.message, 'error');
+        }).then(function () {
+            button.disabled = false;
+            button.textContent = original;
+        });
+    }
+
+    document.querySelectorAll('.save-limit').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const id = button.dataset.id;
+            const field = document.getElementById('limit-' + id);
+            const value = field.value.trim();
+            if (value === '' || Number(value) < 0 || !Number.isInteger(Number(value))) {
+                say('The limit has to be a whole number, or 0 for no limit.', 'error');
+                field.focus();
+                return;
+            }
+            busyWhile(button, 'Saving...', function () {
+                return post('/admin/users/limit', { user_id: id, limit: Number(value) })
+                    .then(function (data) {
+                        const shown = data.effective === 0 ? 'unlimited' : data.effective;
+                        say('Limit set to ' + shown + '.', 'success');
+                    });
+            });
+        });
+    });
+
+    document.querySelectorAll('.reset-usage').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const id = button.dataset.id;
+            busyWhile(button, 'Resetting...', function () {
+                return post('/admin/users/reset-usage', { user_id: id }).then(function (data) {
+                    const line = document.querySelector('[data-usage="' + id + '"]');
+                    if (line) {
+                        line.textContent = line.textContent.replace(/^\s*\d+/, String(data.used));
+                    }
+                    say("Today's usage cleared.", 'success');
+                });
+            });
+        });
     });
 
     // ------------------------------------------------------------------ delete

@@ -157,6 +157,71 @@ def test_invite_link_target_cannot_be_chosen_by_the_caller():
         os.environ.pop("SITE_URL", None)
 
 
+def test_only_an_admin_can_change_a_limit_or_reset_usage():
+    """These control how much of the owner's paid-for API allowance an account
+    can spend, so they are admin-only like the rest of the console."""
+    flask_app = build(AUTH_OPTIONAL="1", SUPABASE_SERVICE_ROLE_KEY="sb_secret_fake",
+                      ADMIN_EMAILS=ADMIN)
+    client = flask_app.app.test_client()
+    body = {"user_id": "11111111-1111-1111-1111-111111111111", "limit": 9999}
+
+    # Anonymous.
+    assert client.post("/admin/users/limit", json=body).status_code == 404
+    assert client.post("/admin/users/reset-usage", json=body).status_code == 404
+
+    # Signed in, but not an admin.
+    sign_in(client, LEARNER)
+    for path in ("/admin/users/limit", "/admin/users/reset-usage"):
+        r = client.post(path, json=body, headers={"X-CSRF-Token": "test-csrf-token"})
+        assert r.status_code == 404, (path, r.status_code)
+
+
+def test_the_limit_routes_check_csrf_and_the_id():
+    flask_app = build(AUTH_OPTIONAL="1", SUPABASE_URL="https://fake.supabase.co",
+                      SUPABASE_SERVICE_ROLE_KEY="sb_secret_fake", ADMIN_EMAILS=ADMIN)
+    client = flask_app.app.test_client()
+    sign_in(client, ADMIN)
+    good = {"user_id": "11111111-1111-1111-1111-111111111111", "limit": 100}
+    token = {"X-CSRF-Token": "test-csrf-token"}
+
+    assert client.post("/admin/users/limit", json=good).status_code == 400      # no token
+    for bad in ("", "not-a-uuid", "../../etc", "1' or '1'='1"):
+        r = client.post("/admin/users/limit", json={"user_id": bad, "limit": 5}, headers=token)
+        assert r.status_code == 400, bad
+
+
+def test_a_limit_must_be_a_sane_whole_number():
+    """It comes from a browser field, so every shape of nonsense has to bounce
+    before it reaches the account service."""
+    flask_app = build(AUTH_OPTIONAL="1", SUPABASE_URL="https://fake.supabase.co",
+                      SUPABASE_SERVICE_ROLE_KEY="sb_secret_fake", ADMIN_EMAILS=ADMIN)
+    client = flask_app.app.test_client()
+    sign_in(client, ADMIN)
+    uid = "11111111-1111-1111-1111-111111111111"
+    token = {"X-CSRF-Token": "test-csrf-token"}
+
+    for bad in (-1, "abc", 10001, [1], {"a": 1}):
+        r = client.post("/admin/users/limit", json={"user_id": uid, "limit": bad}, headers=token)
+        assert r.status_code == 400, bad
+
+
+def test_zero_means_unmetered_not_blocked():
+    """0 has to read as "no limit". Treating it as "allow nothing" would lock
+    the account out of the whole app, which is the opposite of the intent."""
+    from utils import quota
+
+    calls = {}
+    original_limit_for = quota.limit_for
+    quota.limit_for = lambda user_id: 0
+    try:
+        allowed, remaining, _ = quota.check_and_record("11111111-1111-1111-1111-111111111111",
+                                                       "text")
+        assert allowed is True
+        assert remaining == -1              # -1 is the unmetered marker
+    finally:
+        quota.limit_for = original_limit_for
+
+
 if __name__ == "__main__":
     passed = 0
     for name, fn in sorted(globals().items()):

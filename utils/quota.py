@@ -63,8 +63,10 @@ def check_and_record(user_id, kind, exempt=False):
     Losing Supabase degrades to "no quota enforcement", never to "app is down":
     any network failure allows the request and logs a warning.
     """
-    limit = daily_limit()
     if exempt or not user_id or not auth.invites_enabled() or auth.stub_active():
+        return True, -1, None
+    limit = limit_for(user_id)
+    if limit <= 0:                      # an admin set this account to unmetered
         return True, -1, None
 
     since = (datetime.now(timezone.utc) - WINDOW).isoformat()
@@ -108,3 +110,58 @@ def used_today(user_id):
         return _count(response.headers.get('Content-Range'))
     except requests.RequestException:
         return None
+
+
+# ---------------------------------------------------------------- admin controls
+# A per-account override lives in the account's ``app_metadata``. That is only
+# writable with the secret key, so a learner cannot raise their own limit, and
+# it needs no migration - which matters because the schema is applied by hand in
+# the Supabase dashboard.
+
+META_KEY = 'daily_limit'
+
+
+def limit_for(user_id):
+    """This account's daily limit: its override, or the deployment default."""
+    if not user_id or not auth.invites_enabled():
+        return daily_limit()
+    try:
+        response = auth.admin_request('GET', '/admin/users/' + user_id)
+        if response.status_code != 200:
+            return daily_limit()
+        value = ((response.json() or {}).get('app_metadata') or {}).get(META_KEY)
+    except (requests.RequestException, ValueError, AttributeError):
+        return daily_limit()
+    if value is None:
+        return daily_limit()
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return daily_limit()
+
+
+def set_limit(user_id, limit):
+    """Give one account its own limit, or pass None to put it back on the
+    default. Returns True when Supabase accepted it."""
+    if limit is not None:
+        limit = max(0, int(limit))
+    try:
+        response = auth.admin_request(
+            'PUT', '/admin/users/' + user_id,
+            json={'app_metadata': {META_KEY: limit}})
+        return response.status_code < 300
+    except requests.RequestException:
+        return False
+
+
+def reset_usage(user_id):
+    """Wipe this account's usage inside the current window, so it starts the day
+    again. Returns True when Supabase accepted it."""
+    since = (datetime.now(timezone.utc) - WINDOW).isoformat()
+    try:
+        response = _rest('DELETE',
+                         params={'user_id': 'eq.' + user_id, 'created_at': 'gte.' + since},
+                         headers={'Prefer': 'return=minimal'})
+        return response.status_code < 300
+    except requests.RequestException:
+        return False
