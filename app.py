@@ -145,6 +145,15 @@ def security_headers(response):
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
     response.headers.setdefault('X-Frame-Options', 'DENY')
     response.headers.setdefault('Referrer-Policy', 'same-origin')
+    # Nothing here uses a camera, a microphone or location, so refuse them
+    # outright rather than leaving the decision to a future prompt.
+    response.headers.setdefault(
+        'Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()')
+    # HSTS only where the connection is already TLS; sending it over plain http
+    # would pin a scheme the local development server cannot serve.
+    if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https':
+        response.headers.setdefault('Strict-Transport-Security',
+                                    'max-age=31536000; includeSubDomains')
     # Report-Only for now: Prism, Pyodide and the in-browser runner all need
     # eval and blob workers, so enforce only once the console is clean.
     response.headers.setdefault('Content-Security-Policy-Report-Only', (
