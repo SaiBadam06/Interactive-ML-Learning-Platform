@@ -80,7 +80,18 @@ const WALKTHROUGH_HEADINGS = [
     'Key Functions Explained', 'Things To Try'
 ];
 
+// Model output is the only thing that ever reaches this function, and its result
+// goes straight to innerHTML on five pages. Escaping here rather than at each
+// call site means a page added later cannot forget to do it.
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+}
+
 function formatMarkdown(text) {
+    text = escapeHtml(text);
     const isHeading = line => {
         const t = line.trim();
         if (!t || t.length > 70) return false;
@@ -220,6 +231,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    initWording();
+
     // Home hero: one topic box, four destinations.
     const quickTopic = document.getElementById('quickTopic');
     if (quickTopic) {
@@ -238,6 +251,31 @@ document.addEventListener('DOMContentLoaded', () => {
 // Built from what is actually on the page rather than from saved state, so the
 // file always matches what the learner just read - including their own edits to
 // the code and the follow-up thread.
+// innerText is empty for anything inside a hidden tab panel, and every result
+// section now lives in one - so the lesson download silently dropped whichever
+// tab the learner had not opened. textContent always has the characters but
+// loses every line break, which turns a walkthrough into one run-on paragraph.
+// Walk the nodes instead and break at block boundaries, so the file is the same
+// whichever tab happens to be on screen.
+const BLOCK_TAGS = /^(P|DIV|LI|H[1-6]|PRE|UL|OL|TR|SECTION|ARTICLE|BLOCKQUOTE)$/;
+
+function readBlockText(el) {
+    if (!el) return '';
+    let out = '';
+    (function walk(node) {
+        node.childNodes.forEach(child => {
+            if (child.nodeType === Node.TEXT_NODE) {
+                out += child.nodeValue;
+            } else if (child.nodeType === Node.ELEMENT_NODE) {
+                if (child.tagName === 'BR') { out += '\n'; return; }
+                walk(child);
+                if (BLOCK_TAGS.test(child.tagName)) out += '\n';
+            }
+        });
+    })(el);
+    return out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function buildLesson() {
     const value = id => { const el = document.getElementById(id); return el ? el.value : ''; };
     const topic = value('topic').trim() || 'Lesson';
@@ -250,9 +288,13 @@ function buildLesson() {
         ? editor.value
         : (codeEl ? codeEl.textContent : '');
 
-    const explanation = document.getElementById('explanation');
-    if (explanation && explanation.innerText.trim()) {
-        out.push(code ? '## Walkthrough' : '## Explanation', '', explanation.innerText.trim(), '');
+    // The audio page's script is a result in its own right and was never exported.
+    const script = readBlockText(document.getElementById('script'));
+    if (script) out.push('## Script', '', script, '');
+
+    const explanation = readBlockText(document.getElementById('explanation'));
+    if (explanation) {
+        out.push(code ? '## Walkthrough' : '## Explanation', '', explanation, '');
     }
     if (code) {
         out.push('## Code', '', '```python', code, '```', '');
@@ -263,9 +305,9 @@ function buildLesson() {
         out.push('## Code, Section by Section', '');
         sections.forEach(sec => {
             const title = sec.querySelector('.code-section-title');
-            out.push('### ' + (title ? title.innerText.replace(/\s+/g, ' ').trim() : ''), '');
+            out.push('### ' + (title ? readBlockText(title).replace(/\s+/g, ' ') : ''), '');
             const snippet = sec.querySelector('.code-section-code');
-            if (snippet) out.push('```python', snippet.innerText, '```', '');
+            if (snippet) out.push('```python', readBlockText(snippet), '```', '');
             const why = sec.querySelector('.code-section-explanation');
             if (why) out.push(why.textContent, '');
         });
@@ -631,12 +673,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const button = form.querySelector('button');
     const history = [];
     const contextIds = ['explanation', 'codeContent', 'script', 'prompts'];
-    const escapeHtml = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
     const addMessage = (role, text) => {
         const div = document.createElement('div');
         div.className = 'follow-up-msg ' + role;
-        div.innerHTML = formatMarkdown(escapeHtml(text));
+        div.innerHTML = formatMarkdown(text);
         thread.appendChild(div);
         div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         return div;
@@ -677,7 +718,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Failed to answer');
-            pending.innerHTML = formatMarkdown(escapeHtml(data.answer));
+            pending.innerHTML = formatMarkdown(data.answer);
             history.push({ role: 'user', content: question });
             history.push({ role: 'assistant', content: data.answer });
         } catch (err) {
@@ -689,6 +730,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+
+// ===== Reading level =====
+// How hard the sentences are, which is a different question from how much theory
+// the reader wants - a learner can want Advanced material in plain English, or be
+// reading in a second language. Stored per browser so it is set once rather than
+// on every page, and sent with every generation request.
+//
+// The server re-validates the value against its own allow-list, so a tampered
+// localStorage entry cannot smuggle text into a prompt.
+const WORDINGS = ['Simple', 'Standard'];
+
+function wordingPref() {
+    try {
+        const stored = localStorage.getItem('wording');
+        return WORDINGS.includes(stored) ? stored : 'Standard';
+    } catch (e) {
+        return 'Standard';           // private mode, or storage blocked
+    }
+}
+
+function setWordingPref(value) {
+    if (!WORDINGS.includes(value)) return;
+    try { localStorage.setItem('wording', value); } catch (e) { /* preference is not critical */ }
+    // Keep every control on the page in step, including one in another section.
+    document.querySelectorAll('input[data-wording]').forEach(radio => {
+        radio.checked = radio.value === value;
+    });
+}
+
+// Attached once, centrally, for the same reason the server gates auth in a
+// before_request hook: a page added later cannot forget to opt in.
+const _nativeFetch = window.fetch.bind(window);
+window.fetch = function (input, init) {
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    const method = ((init && init.method) || 'GET').toUpperCase();
+    if (method === 'POST' && url.indexOf('/api/') === 0 && init && typeof init.body === 'string') {
+        try {
+            const body = JSON.parse(init.body);
+            if (body && typeof body === 'object' && !Array.isArray(body) && !('wording' in body)) {
+                body.wording = wordingPref();
+                init = Object.assign({}, init, { body: JSON.stringify(body) });
+            }
+        } catch (e) { /* not a JSON body - send it untouched */ }
+    }
+    return _nativeFetch(input, init);
+};
+
+function initWording() {
+    const current = wordingPref();
+    document.querySelectorAll('input[data-wording]').forEach(radio => {
+        radio.checked = radio.value === current;
+        radio.addEventListener('change', () => {
+            if (radio.checked) setWordingPref(radio.value);
+        });
+    });
+}
 
 // Make functions globally available
 window.showToast = showToast;
@@ -702,3 +800,5 @@ window.selectTab = selectTab;
 window.markTabNew = markTabNew;
 // The lesson download (below) needs whatever quiz is currently on screen.
 window.getLastQuiz = () => lastQuiz;
+window.wordingPref = wordingPref;
+window.setWordingPref = setWordingPref;

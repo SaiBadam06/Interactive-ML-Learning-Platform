@@ -1,135 +1,155 @@
 {% extends "base.html" %}
 
-{% block title %}Text Explanation - ML Learning Assistant{% endblock %}
+{% block title %}Explain - GyanGuru{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container container-wide">
     <div class="page-header">
-        <h1><i class="fas fa-book"></i> Text Explanation</h1>
-        <p>Get comprehensive text-based explanations of any Machine Learning topic</p>
+        <h1>Explain</h1>
+        <p>A written explanation of any ML idea, at the depth you ask for, with a quiz to check it landed.</p>
     </div>
 
-    <div class="content-wrapper">
-        <!-- Input Section -->
-        <div class="input-section card">
-            <h2>What would you like to learn?</h2>
-            
-            <div class="recent-topics" id="recentTopics" hidden></div>
+    <div class="card">
+        <form id="textForm">
+            <div class="form-group">
+                <label for="topic">What do you want explained?</label>
+                <input type="text" id="topic" name="topic" class="form-control input-large"
+                       placeholder="e.g. neural networks, decision trees, gradient descent" required>
+                <small class="form-hint">Name the concept, algorithm or technique. The narrower the topic, the more the answer can say about it.</small>
+            </div>
 
-            <form id="textForm">
-                <div class="form-group">
-                    <label for="topic">
-                        <i class="fas fa-lightbulb"></i> Machine Learning Topic
-                    </label>
-                    <input 
-                        type="text" 
-                        id="topic" 
-                        name="topic" 
-                        class="form-control" 
-                        placeholder="e.g., neural networks, decision trees, clustering, reinforcement learning"
-                        required
-                    >
-                    <small class="form-hint">Enter any ML concept, algorithm, or technique you want to understand</small>
-                </div>
+            <div class="chip-row mt-4 recent-topics" id="recentTopics" hidden></div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="length">
-                            <i class="fas fa-sliders-h"></i> Explanation Depth
-                        </label>
-                        <select id="length" name="length" class="form-control">
-                            <option value="Brief">Brief - Quick overview (2-3 paragraphs)</option>
-                            <option value="Detailed" selected>Detailed - In-depth explanation (5-7 paragraphs)</option>
-                            <option value="Comprehensive">Comprehensive - Complete guide (10+ paragraphs)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="level">
-                            <i class="fas fa-user-graduate"></i> Explain for
-                        </label>
-                        <select id="level" name="level" class="form-control">
-                            <option value="Beginner" selected>Beginner</option>
-                            <option value="Intermediate">Intermediate</option>
-                            <option value="Advanced">Advanced</option>
-                        </select>
-                    </div>
-                </div>
+            <div class="form-row mt-4">
+                <fieldset class="segmented">
+                    <legend>Explain for</legend>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Beginner" checked><span>Beginner</span></label>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Intermediate"><span>Intermediate</span></label>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Advanced"><span>Advanced</span></label>
+                </fieldset>
+                <fieldset class="segmented">
+                    <legend>Length</legend>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Brief"><span>Brief</span></label>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Detailed" checked><span>Detailed</span></label>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Comprehensive"><span>Full</span></label>
+                </fieldset>
+                <fieldset class="segmented">
+                    <legend>Wording</legend>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Simple"><span>Simple</span></label>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Standard" checked><span>Standard</span></label>
+                </fieldset>
+            </div>
+            <p class="form-hint">
+                "Explain for" sets how much theory you get. "Wording" sets how hard the
+                sentences are - pick Simple for short sentences and everyday words. It is
+                remembered on every page.
+            </p>
+            <input type="hidden" id="level" value="Beginner">
+            <input type="hidden" id="length" value="Detailed">
 
-                <button type="submit" class="btn btn-primary btn-large">
-                    <i class="fas fa-rocket"></i> Generate Explanation
-                </button>
-            </form>
+            <button type="submit" class="btn btn-primary btn-large mt-4">Generate explanation</button>
+        </form>
+    </div>
+
+    <!-- Skeleton in the shape of the coming result. The page stays usable. -->
+    <div class="skeleton card mt-5" id="skeleton" hidden aria-hidden="true">
+        <div class="skeleton-head">
+            <span id="loadingMessage">Writing your explanation</span>
+            <span id="loadingElapsed"></span>
         </div>
-
-        <!-- Output Section -->
-        <div id="outputSection" class="output-section card" style="display: none;">
-            <div class="output-header">
-                <h2><i class="fas fa-file-alt"></i> Your Explanation</h2>
-                <div class="output-actions">
-                    <button id="copyBtn" class="btn btn-secondary">
-                        <i class="fas fa-copy"></i> Copy
-                    </button>
-                    <button id="downloadBtn" class="btn btn-secondary">
-                        <i class="fas fa-download"></i> Download
-                    </button>
-                    <button id="downloadLessonBtn" class="btn btn-secondary">
-                        <i class="fas fa-file-arrow-down"></i> Download lesson (.md)
-                    </button>
-                </div>
-            </div>
-            
-            <div class="continue-row" id="continueRow" data-current="text" hidden></div>
-
-            <div id="explanation" class="explanation-content"></div>
-        
-            <!-- Check your understanding -->
-            <div class="card quiz-card" id="quizCard" data-context-ids="explanation">
-                <div class="output-header">
-                    <h2><i class="fas fa-circle-question"></i> Check your understanding</h2>
-                    <div class="output-actions">
-                        <button id="quizGenerateBtn" class="btn btn-secondary">
-                            <i class="fas fa-wand-magic-sparkles"></i> Generate quiz
-                        </button>
-                    </div>
-                </div>
-                <p class="section-hint">A few questions on what you just read. Answers are checked as you go.</p>
-                <div id="quizContent" class="quiz-content"></div>
-            </div>
-
-            <!-- Ask a follow-up -->
-            <div class="card follow-up-card">
-                <div class="follow-up" id="followUp">
-                    <h3><i class="fas fa-comments"></i> Ask a follow-up</h3>
-                    <p class="follow-up-hint">Stuck on a step? Ask about anything above.</p>
-                    <div id="followUpThread" class="follow-up-thread"></div>
-                    <form id="followUpForm" class="follow-up-form" autocomplete="off">
-                        <input type="text" id="followUpInput" class="form-control" maxlength="500" required
-                               placeholder="e.g. Can you give a simpler analogy?   What is the intuition here?">
-                        <button type="submit" class="btn btn-primary">Ask</button>
-                    </form>
-                </div>
-            </div>
+        <div class="skeleton-bars">
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
         </div>
     </div>
 
-    <!-- Tips Section -->
-    <div class="tips-section">
-        <h3><i class="fas fa-lightbulb"></i> Tips for Better Learning</h3>
-        <div class="tips-grid">
-            <div class="tip-card">
-                <i class="fas fa-search"></i>
-                <h4>Be Specific</h4>
-                <p>Use clear, specific terms like "convolutional neural networks" instead of just "CNN"</p>
+    <div id="outputSection" class="mt-5" hidden>
+        <div class="results-head">
+            <h2 class="results-title" id="resultsTitle">Your explanation</h2>
+            <div class="card-actions">
+                <span class="results-meta" id="resultsMeta"></span>
+                <button id="downloadLessonBtn" class="btn btn-outline" type="button">Download lesson</button>
             </div>
-            <div class="tip-card">
-                <i class="fas fa-layer-group"></i>
-                <h4>Build Foundation</h4>
-                <p>Start with basic concepts before moving to advanced topics</p>
+        </div>
+
+        <div class="chip-row continue-row" id="continueRow" data-current="text" hidden></div>
+
+        <!-- Results tabs. The follow-up card below is deliberately NOT a tab. -->
+        <div class="tabs mt-4" id="resultTabs">
+            <div class="tablist" role="tablist" aria-label="Results">
+                <button class="tab" role="tab" id="tab-explanation" data-tab="explanation"
+                        aria-controls="panel-explanation" aria-selected="true">Explanation</button>
+                <button class="tab" role="tab" id="tab-practice" data-tab="practice"
+                        aria-controls="panel-practice" aria-selected="false" tabindex="-1">Practice</button>
             </div>
-            <div class="tip-card">
-                <i class="fas fa-redo"></i>
-                <h4>Iterate</h4>
-                <p>Don't hesitate to ask follow-up questions for clarity</p>
+
+            <!-- Explanation -->
+            <div class="tabpanel" role="tabpanel" id="panel-explanation" aria-labelledby="tab-explanation" tabindex="0">
+                <div class="card card--primary">
+                    <div class="card-head">
+                        <h2>The explanation</h2>
+                        <div class="card-actions">
+                            <button id="copyBtn" class="btn btn-outline" type="button">Copy</button>
+                            <button id="downloadBtn" class="btn btn-outline" type="button">Download .txt</button>
+                        </div>
+                    </div>
+                    <div id="explanation" class="explanation-content"></div>
+                </div>
+
+                <details class="disclosure mt-5">
+                    <summary>Get more out of this</summary>
+                    <div class="disclosure-body">
+                        <ul class="icon-list">
+                            <li>
+                                <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+                                <span><strong>Be specific.</strong> Ask for convolutional neural networks rather than CNN. A narrow topic gets a deeper answer.</span>
+                            </li>
+                            <li>
+                                <i class="fas fa-layer-group" aria-hidden="true"></i>
+                                <span><strong>Build up.</strong> Read what a concept rests on first, then raise the level. Beginner, then Intermediate on the same topic works well.</span>
+                            </li>
+                            <li>
+                                <i class="fas fa-rotate" aria-hidden="true"></i>
+                                <span><strong>Keep asking.</strong> Anything still murky is a follow-up question below, answered without losing your place.</span>
+                            </li>
+                            <li>
+                                <i class="fas fa-code" aria-hidden="true"></i>
+                                <span><strong>Then see it run.</strong> Continue with this topic above carries it to the code, audio and image pages.</span>
+                            </li>
+                        </ul>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Practice -->
+            <div class="tabpanel" role="tabpanel" id="panel-practice" aria-labelledby="tab-practice" tabindex="0" hidden>
+                <div class="card" id="quizCard" data-context-ids="explanation" data-tab="tab-practice">
+                    <div class="card-head">
+                        <h2>Check your understanding</h2>
+                        <div class="card-actions">
+                            <button id="quizGenerateBtn" class="btn btn-primary" type="button">Generate quiz</button>
+                        </div>
+                    </div>
+                    <p class="section-hint">Key terms and a few questions on what you just read. Answers are checked as you go.</p>
+                    <div id="quizContent" role="status" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ask a follow-up: pinned below the panel, visible from every tab. -->
+        <div class="card follow-up-card">
+            <div id="followUp">
+                <h2>Ask a follow-up</h2>
+                <p class="follow-up-hint">Stuck on a step? Ask about anything above. The answer arrives here, so nothing you were reading is hidden.</p>
+                <div id="followUpThread" class="follow-up-thread"></div>
+                <form id="followUpForm" class="follow-up-form" autocomplete="off">
+                    <label class="sr-only" for="followUpInput">Your question</label>
+                    <input type="text" id="followUpInput" class="form-control" maxlength="500" required
+                           placeholder="e.g. Can you give a simpler analogy? What is the intuition here?">
+                    <button type="submit" class="btn btn-primary">Ask</button>
+                </form>
             </div>
         </div>
     </div>

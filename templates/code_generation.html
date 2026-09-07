@@ -33,7 +33,17 @@
                     <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Detailed" checked><span>Detailed</span></label>
                     <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Comprehensive"><span>Full</span></label>
                 </fieldset>
+                <fieldset class="segmented">
+                    <legend>Wording</legend>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Simple"><span>Simple</span></label>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Standard" checked><span>Standard</span></label>
+                </fieldset>
             </div>
+            <p class="form-hint">
+                "Explain for" sets how much theory you get. "Wording" sets how hard the
+                sentences are - pick Simple for short sentences and everyday words. It is
+                remembered on every page.
+            </p>
             <input type="hidden" id="level" value="Beginner">
             <input type="hidden" id="length" value="Detailed">
 
@@ -93,13 +103,11 @@
                     </div>
                     <p class="section-hint">Runs in your browser, nothing is sent to a server. Click a line number to ask about that line.</p>
 
-                    <div class="code-container">
                         <div class="code-with-gutter" id="codeScroller">
                             <div class="code-gutter" id="codeGutter"></div>
                             <pre id="codePre"><code id="codeContent" class="language-python"></code></pre>
                         </div>
-                        <textarea id="codeEditor" class="code-editor" spellcheck="false" style="display: none;"></textarea>
-                    </div>
+                    <textarea id="codeEditor" class="code-editor" spellcheck="false" style="display: none;"></textarea>
 
                     <div id="runOutput" class="run-output" style="display: none;">
                         <div class="run-status" id="runStatus" role="status" aria-live="polite"></div>
@@ -155,7 +163,7 @@
 
             <!-- Practice -->
             <div class="tabpanel" role="tabpanel" id="panel-practice" aria-labelledby="tab-practice" tabindex="0" hidden>
-                <div class="card quiz-card" id="quizCard" data-context-ids="explanation codeContent" data-tab="tab-practice">
+                <div class="card" id="quizCard" data-context-ids="explanation codeContent" data-tab="tab-practice">
                     <div class="card-head">
                         <h2>Check your understanding</h2>
                         <div class="card-actions">
@@ -163,14 +171,14 @@
                         </div>
                     </div>
                     <p class="section-hint">Key terms and a few questions on the program. Answers are checked as you go.</p>
-                    <div id="quizContent" class="quiz-content" role="status" aria-live="polite"></div>
+                    <div id="quizContent" role="status" aria-live="polite"></div>
                 </div>
             </div>
         </div>
 
         <!-- Ask a follow-up: pinned below the panel, visible from every tab. -->
         <div class="card follow-up-card">
-            <div class="follow-up" id="followUp">
+            <div id="followUp">
                 <h2>Ask a follow-up</h2>
                 <p class="follow-up-hint">Stuck on a step? Ask about anything above. The answer arrives here, so nothing you were reading is hidden.</p>
                 <div id="followUpThread" class="follow-up-thread"></div>

@@ -1,64 +1,78 @@
 {% extends "base.html" %}
 
-{% block title %}Practice - ML Learning Assistant{% endblock %}
+{% block title %}Practice - GyanGuru{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="page-header">
-        <h1><i class="fas fa-circle-question"></i> Practice</h1>
-        <p>Quiz yourself, or your students, on any topic without generating an explanation first</p>
+        <h1>Practice</h1>
+        <p>Quiz yourself, or your students, on any topic without generating a lesson first.</p>
     </div>
 
-    <div class="content-wrapper">
-        <!-- Input Section -->
-        <div class="input-section card">
-            <h2>What would you like to be quizzed on?</h2>
-
-            <div class="recent-topics" id="recentTopics" hidden></div>
-
-            <form id="practiceForm">
-                <div class="form-group">
-                    <label for="topic">
-                        <i class="fas fa-lightbulb"></i> Machine Learning Topic
-                    </label>
-                    <input
-                        type="text"
-                        id="topic"
-                        name="topic"
-                        class="form-control"
-                        placeholder="e.g., Q-learning, gradient descent, bias-variance tradeoff"
-                        required
-                    >
-                    <small class="form-hint">Three to six multiple-choice questions, checked as you answer</small>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="level">
-                            <i class="fas fa-user-graduate"></i> Explain for
-                        </label>
-                        <select id="level" name="level" class="form-control">
-                            <option value="Beginner" selected>Beginner</option>
-                            <option value="Intermediate">Intermediate</option>
-                            <option value="Advanced">Advanced</option>
-                        </select>
-                    </div>
-                </div>
-
-                <button type="submit" id="quizGenerateBtn" class="btn btn-primary btn-large">
-                    <i class="fas fa-wand-magic-sparkles"></i> Generate quiz
-                </button>
-            </form>
-        </div>
-
-        <!-- Quiz -->
-        <div class="card quiz-card" id="quizCard" data-context-ids="">
-            <div class="output-header">
-                <h2><i class="fas fa-list-check"></i> Your questions</h2>
+    <div class="card">
+        <form id="practiceForm">
+            <div class="form-group">
+                <label for="topic">What should the questions be about?</label>
+                <input type="text" id="topic" name="topic" class="form-control input-large"
+                       placeholder="e.g. Q-learning, gradient descent, bias-variance tradeoff" required>
+                <small class="form-hint">Three to six multiple-choice questions, plus the key terms behind them.</small>
             </div>
-            <p class="section-hint">Pick an answer to see whether it is right and why.</p>
-            <div id="quizContent" class="quiz-content"></div>
+
+            <div class="chip-row mt-4 recent-topics" id="recentTopics" hidden></div>
+
+            <div class="form-row mt-4">
+            <fieldset class="segmented">
+                <legend>Pitch the questions for</legend>
+                <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Beginner" checked><span>Beginner</span></label>
+                <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Intermediate"><span>Intermediate</span></label>
+                <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Advanced"><span>Advanced</span></label>
+            </fieldset>
+                <fieldset class="segmented">
+                    <legend>Wording</legend>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Simple"><span>Simple</span></label>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Standard" checked><span>Standard</span></label>
+                </fieldset>
+            </div>
+            <p class="form-hint">
+                "Explain for" sets how much theory you get. "Wording" sets how hard the
+                sentences are - pick Simple for short sentences and everyday words. It is
+                remembered on every page.
+            </p>
+            <input type="hidden" id="level" value="Beginner">
+
+            <button type="submit" id="quizGenerateBtn" class="btn btn-primary btn-large mt-4">Generate quiz</button>
+        </form>
+    </div>
+
+    <div class="card mt-5" id="quizCard" data-context-ids="">
+        <div class="card-head">
+            <h2>Your questions</h2>
+            <div class="card-actions">
+                <button id="downloadLessonBtn" class="btn btn-outline" type="button">Download questions</button>
+            </div>
+        </div>
+        <p class="section-hint">Pick an answer to see whether it is right and why. Each question locks once you answer, so the score means something.</p>
+        <div id="quizContent" role="status" aria-live="polite">
+            <p class="muted">No questions yet. Enter a topic above and generate a set.</p>
         </div>
     </div>
+
+    <details class="disclosure mt-5">
+        <summary>Using this to revise</summary>
+        <div class="disclosure-body">
+            <p>The questions come from a language model reading nothing but your topic and level,
+               so they test recall of the mainstream account of an idea, not a syllabus.</p>
+            <ul>
+                <li>Answer before reading anything. What you get wrong is the part worth studying.</li>
+                <li>Open a term chip to see its definition when a question turns on a word you half know.</li>
+                <li>Generate another set on the same topic for different questions.</li>
+                <li>Download the set to hand out or revise from later; the answers are at the end of the file.</li>
+            </ul>
+            <div class="callout callout-warn">
+                A wrong answer key is possible. If a question and its explanation disagree with your
+                course notes, trust the notes and move on.
+            </div>
+        </div>
+    </details>
 </div>
 {% endblock %}

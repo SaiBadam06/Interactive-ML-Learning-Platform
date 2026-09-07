@@ -1,146 +1,173 @@
 {% extends "base.html" %}
 
-{% block title %}Audio Learning - ML Learning Assistant{% endblock %}
+{% block title %}Audio - GyanGuru{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container container-wide">
     <div class="page-header">
-        <h1><i class="fas fa-headphones"></i> Audio Learning</h1>
-        <p>Listen to AI-generated audio explanations of ML concepts - perfect for learning on the go!</p>
+        <h1>Audio</h1>
+        <p>A spoken lesson on any ML idea, with the script to read along and notes to keep.</p>
     </div>
 
-    <div class="content-wrapper">
-        <!-- Input Section -->
-        <div class="input-section card">
-            <h2>What would you like to listen to?</h2>
-            
-            <div class="recent-topics" id="recentTopics" hidden></div>
+    <div class="card">
+        <form id="audioForm">
+            <div class="form-group">
+                <label for="topic">What should the lesson cover?</label>
+                <input type="text" id="topic" name="topic" class="form-control input-large"
+                       placeholder="e.g. support vector machines, gradient descent, overfitting" required>
+                <small class="form-hint">Name the concept you want narrated. One idea per lesson listens better than five.</small>
+            </div>
 
-            <form id="audioForm">
-                <div class="form-group">
-                    <label for="topic">
-                        <i class="fas fa-lightbulb"></i> Machine Learning Topic
-                    </label>
-                    <input 
-                        type="text" 
-                        id="topic" 
-                        name="topic" 
-                        class="form-control" 
-                        placeholder="e.g., support vector machines, neural networks, gradient descent"
-                        required
-                    >
-                    <small class="form-hint">Enter any ML topic you want to learn about through audio</small>
-                </div>
+            <div class="chip-row mt-4 recent-topics" id="recentTopics" hidden></div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="length">
-                            <i class="fas fa-sliders-h"></i> Audio Length
-                        </label>
-                        <select id="length" name="length" class="form-control">
-                            <option value="Brief">Brief - 2-3 minutes</option>
-                            <option value="Detailed" selected>Detailed - 5-7 minutes</option>
-                            <option value="Comprehensive">Comprehensive - 10+ minutes</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="level">
-                            <i class="fas fa-user-graduate"></i> Explain for
-                        </label>
-                        <select id="level" name="level" class="form-control">
-                            <option value="Beginner" selected>Beginner</option>
-                            <option value="Intermediate">Intermediate</option>
-                            <option value="Advanced">Advanced</option>
-                        </select>
-                    </div>
-                </div>
+            <div class="form-row mt-4">
+                <fieldset class="segmented">
+                    <legend>Explain for</legend>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Beginner" checked><span>Beginner</span></label>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Intermediate"><span>Intermediate</span></label>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Advanced"><span>Advanced</span></label>
+                </fieldset>
+                <fieldset class="segmented">
+                    <legend>Length</legend>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Brief"><span>2-3 min</span></label>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Detailed" checked><span>5-7 min</span></label>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Comprehensive"><span>10+ min</span></label>
+                </fieldset>
+                <fieldset class="segmented">
+                    <legend>Wording</legend>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Simple"><span>Simple</span></label>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Standard" checked><span>Standard</span></label>
+                </fieldset>
+            </div>
+            <p class="form-hint">
+                "Explain for" sets how much theory you get. "Wording" sets how hard the
+                sentences are - pick Simple for short sentences and everyday words. It is
+                remembered on every page.
+            </p>
+            <input type="hidden" id="level" value="Beginner">
+            <input type="hidden" id="length" value="Detailed">
 
-                <button type="submit" class="btn btn-primary btn-large">
-                    <i class="fas fa-rocket"></i> Generate Audio
-                </button>
-            </form>
+            <button type="submit" class="btn btn-primary btn-large mt-4">Generate audio</button>
+        </form>
+    </div>
+
+    <!-- Skeleton in the shape of the coming result. The page stays usable. -->
+    <div class="skeleton card mt-5" id="skeleton" hidden aria-hidden="true">
+        <div class="skeleton-head">
+            <span id="loadingMessage">Writing and recording your lesson</span>
+            <span id="loadingElapsed"></span>
         </div>
-
-        <!-- Output Section -->
-        <div id="outputSection" class="output-section" style="display: none;">
-            <div class="continue-row" id="continueRow" data-current="audio" hidden></div>
-
-            <!-- Audio Player -->
-            <div class="card audio-player-card">
-                <div class="output-header">
-                    <h2><i class="fas fa-music"></i> Audio Lesson</h2>
-                    <div class="output-actions">
-                        <button id="downloadAudioBtn" class="btn btn-secondary">
-                            <i class="fas fa-download"></i> Download MP3
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="audioPlayer" class="audio-player">
-                    <!-- Audio will be dynamically inserted here -->
-                </div>
-
-                <div class="audio-info">
-                    <p><i class="fas fa-info-circle"></i> Listen to this explanation anywhere - download the MP3 for offline learning!</p>
-                </div>
-            </div>
-
-            <!-- Script -->
-            <div class="card">
-                <div class="output-header">
-                    <h2><i class="fas fa-file-alt"></i> Audio Script</h2>
-                    <div class="output-actions">
-                        <button id="copyScriptBtn" class="btn btn-secondary">
-                            <i class="fas fa-copy"></i> Copy Script
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="script" class="script-content"></div>
-            </div>
-
-            <!-- Explanation -->
-            <div class="card">
-                <div class="output-header">
-                    <h2><i class="fas fa-book"></i> Additional Details</h2>
-                </div>
-                <div id="explanation" class="explanation-content"></div>
-            </div>
-        
-            <!-- Ask a follow-up -->
-            <div class="card follow-up-card">
-                <div class="follow-up" id="followUp">
-                    <h3><i class="fas fa-comments"></i> Ask a follow-up</h3>
-                    <p class="follow-up-hint">Stuck on a step? Ask about anything above.</p>
-                    <div id="followUpThread" class="follow-up-thread"></div>
-                    <form id="followUpForm" class="follow-up-form" autocomplete="off">
-                        <input type="text" id="followUpInput" class="form-control" maxlength="500" required
-                               placeholder="e.g. Can you rephrase that part?   What does that term mean?">
-                        <button type="submit" class="btn btn-primary">Ask</button>
-                    </form>
-                </div>
-            </div>
+        <div class="skeleton-bars">
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
         </div>
     </div>
 
-    <!-- Audio Learning Tips -->
-    <div class="tips-section">
-        <h3><i class="fas fa-lightbulb"></i> Audio Learning Tips</h3>
-        <div class="tips-grid">
-            <div class="tip-card">
-                <i class="fas fa-walking"></i>
-                <h4>Learn While Moving</h4>
-                <p>Download the audio and listen during walks, commutes, or workouts</p>
+    <div id="outputSection" class="mt-5" hidden>
+        <div class="results-head">
+            <h2 class="results-title" id="resultsTitle">Your audio lesson</h2>
+            <div class="card-actions">
+                <span class="results-meta" id="resultsMeta"></span>
+                <button id="downloadLessonBtn" class="btn btn-outline" type="button">Download lesson</button>
             </div>
-            <div class="tip-card">
-                <i class="fas fa-redo"></i>
-                <h4>Repeat & Retain</h4>
-                <p>Listen multiple times to reinforce your understanding</p>
+        </div>
+
+        <div class="chip-row continue-row" id="continueRow" data-current="audio" hidden></div>
+
+        <!-- Results tabs. The follow-up card below is deliberately NOT a tab. -->
+        <div class="tabs mt-4" id="resultTabs">
+            <div class="tablist" role="tablist" aria-label="Results">
+                <button class="tab" role="tab" id="tab-script" data-tab="script"
+                        aria-controls="panel-script" aria-selected="true">Script</button>
+                <button class="tab" role="tab" id="tab-notes" data-tab="notes"
+                        aria-controls="panel-notes" aria-selected="false" tabindex="-1">Notes</button>
+                <button class="tab" role="tab" id="tab-practice" data-tab="practice"
+                        aria-controls="panel-practice" aria-selected="false" tabindex="-1">Practice</button>
             </div>
-            <div class="tip-card">
-                <i class="fas fa-notes-medical"></i>
-                <h4>Take Notes</h4>
-                <p>Pause and jot down key points for better retention</p>
+
+            <!-- Script: the player, then the words it is reading -->
+            <div class="tabpanel" role="tabpanel" id="panel-script" aria-labelledby="tab-script" tabindex="0">
+                <div class="card card--primary">
+                    <div class="card-head">
+                        <h2>Listen</h2>
+                        <div class="card-actions">
+                            <button id="downloadAudioBtn" class="btn btn-outline" type="button">Download MP3</button>
+                        </div>
+                    </div>
+                    <p class="section-hint">Play it here, or take the MP3 with you and listen offline.</p>
+                    <div id="audioPlayer" class="audio-player"></div>
+                </div>
+
+                <div class="card mt-5">
+                    <div class="card-head">
+                        <h2>The script</h2>
+                        <div class="card-actions">
+                            <button id="copyScriptBtn" class="btn btn-outline" type="button">Copy script</button>
+                        </div>
+                    </div>
+                    <p class="section-hint">Word for word what you are hearing. Read along, or skim it to find the part you want again.</p>
+                    <div id="script" class="script-content"></div>
+                </div>
+
+                <details class="disclosure mt-5">
+                    <summary>Listen better</summary>
+                    <div class="disclosure-body">
+                        <ul class="icon-list">
+                            <li>
+                                <i class="fas fa-person-walking" aria-hidden="true"></i>
+                                <span><strong>Take it with you.</strong> Download the MP3 and play it on a walk, a commute or a workout - no connection needed.</span>
+                            </li>
+                            <li>
+                                <i class="fas fa-rotate" aria-hidden="true"></i>
+                                <span><strong>Play it twice.</strong> The second pass is where the details stick. Skim the script first if the topic is new.</span>
+                            </li>
+                            <li>
+                                <i class="fas fa-pen" aria-hidden="true"></i>
+                                <span><strong>Pause and write.</strong> Stop at each idea and put it in your own words, then check yourself on the Practice tab.</span>
+                            </li>
+                        </ul>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Notes: the written detail behind the narration -->
+            <div class="tabpanel" role="tabpanel" id="panel-notes" aria-labelledby="tab-notes" tabindex="0" hidden>
+                <div class="card">
+                    <div class="card-head"><h2>Notes</h2></div>
+                    <p class="section-hint">The written detail behind the narration - definitions, caveats and the bits worth re-reading.</p>
+                    <div id="explanation" class="explanation-content"></div>
+                </div>
+            </div>
+
+            <!-- Practice -->
+            <div class="tabpanel" role="tabpanel" id="panel-practice" aria-labelledby="tab-practice" tabindex="0" hidden>
+                <div class="card" id="quizCard" data-context-ids="script explanation" data-tab="tab-practice">
+                    <div class="card-head">
+                        <h2>Check your understanding</h2>
+                        <div class="card-actions">
+                            <button id="quizGenerateBtn" class="btn btn-primary" type="button">Generate quiz</button>
+                        </div>
+                    </div>
+                    <p class="section-hint">Key terms and a few questions on the lesson you just heard. Answers are checked as you go.</p>
+                    <div id="quizContent" role="status" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ask a follow-up: pinned below the panel, visible from every tab. -->
+        <div class="card follow-up-card">
+            <div id="followUp">
+                <h2>Ask a follow-up</h2>
+                <p class="follow-up-hint">Something go past too fast? Ask about anything above. The answer arrives here, so the lesson keeps its place.</p>
+                <div id="followUpThread" class="follow-up-thread"></div>
+                <form id="followUpForm" class="follow-up-form" autocomplete="off">
+                    <label class="sr-only" for="followUpInput">Your question</label>
+                    <input type="text" id="followUpInput" class="form-control" maxlength="500" required
+                           placeholder="e.g. Can you rephrase that part? What does that term mean?">
+                    <button type="submit" class="btn btn-primary">Ask</button>
+                </form>
             </div>
         </div>
     </div>

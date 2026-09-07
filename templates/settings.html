@@ -90,6 +90,49 @@
                 <li>ADMIN_EMAILS, SITE_URL <span class="muted">— who may invite, and where invite links point</span></li>
             </ul>
         </div>
+
+        {# 7. About - folded in from the old /about page, which now redirects here. #}
+        <div class="card">
+            <div class="card-head" id="about"><h2>About GyanGuru</h2></div>
+            <p>GyanGuru turns a machine learning topic you name into a lesson you can read, run,
+               listen to and be quizzed on. It is a study aid for people learning ML mostly on their
+               own, and it is free and open source.</p>
+            <ul class="icon-list">
+                <li><i class="fas fa-graduation-cap" aria-hidden="true"></i>
+                    <span><strong>Students</strong> — a second explanation of a lecture that did not land, at the level you actually need.</span></li>
+                <li><i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+                    <span><strong>Practitioners</strong> — a runnable sketch of an algorithm before you commit to a library.</span></li>
+                <li><i class="fas fa-chalkboard-user" aria-hidden="true"></i>
+                    <span><strong>Educators</strong> — a first draft of an example or a quiz to edit into your own material.</span></li>
+            </ul>
+
+            <div class="callout callout-warn mt-4">
+                <strong>Read this before you trust anything here.</strong> Every lesson, diagram and
+                quiz answer is written by a language model, so any of it can be confidently wrong.
+                Run the code, check the claims against your course notes or the library docs, and
+                never cite this page as a source. Generation runs on NVIDIA's free tier, which is
+                rate limited — a request can be slow or fail outright, and trying again in a minute
+                usually clears it.
+            </div>
+
+            <details class="disclosure mt-5">
+                <summary>What it runs on</summary>
+                <div class="disclosure-body">
+                    <dl class="kv">
+                        <dt>Text</dt><dd>NVIDIA NIM, free tier</dd>
+                        <dt>Diagrams</dt><dd>FLUX.1-dev by Black Forest Labs, served through NVIDIA NIM</dd>
+                        <dt>Audio</dt><dd>gTTS, Google's text-to-speech</dd>
+                        <dt>Running code</dt><dd>Pyodide, CPython compiled to WebAssembly, in your browser</dd>
+                        <dt>Highlighting</dt><dd>Prism</dd>
+                        <dt>App</dt><dd>Python and Flask, with plain HTML, CSS and JavaScript</dd>
+                        <dt>Accounts</dt><dd>Supabase, only when it is configured</dd>
+                    </dl>
+                </div>
+            </details>
+
+            <p class="mt-5">MIT licensed. Bugs, ideas and pull requests go to
+               <a href="https://github.com/SaiBadam06/Interactive-ML-Learning-Platform" target="_blank" rel="noopener">the repository on GitHub</a>.</p>
+        </div>
     </div>
 </div>
 

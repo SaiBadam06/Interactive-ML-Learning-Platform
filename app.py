@@ -87,19 +87,26 @@ CODE_DIR = os.path.join(DATA_DIR, 'generated_code')
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg'}
 VALID_LENGTHS = {'Brief', 'Detailed', 'Comprehensive'}
 VALID_LEVELS = {'Beginner', 'Intermediate', 'Advanced'}
+# How hard the sentences are, asked separately from how deep the content goes.
+VALID_WORDINGS = {'Simple', 'Standard'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 os.environ['DATA_DIR'] = DATA_DIR  # utils/ read this to place their output
 
 
 def read_request():
-    """Validated (topic, length, level, api_key) from the JSON body, tolerant of bad input."""
+    """Validated (topic, length, level, wording, api_key) from the JSON body.
+
+    Tolerant of bad input: anything unrecognised falls back to the safe default
+    rather than raising, because these arrive straight from a form.
+    """
     data = request.get_json(silent=True) or {}
     topic = str(data.get('topic') or '').strip()[:300]
     length = data.get('length') if data.get('length') in VALID_LENGTHS else 'Brief'
     level = data.get('level') if data.get('level') in VALID_LEVELS else 'Beginner'
+    wording = data.get('wording') if data.get('wording') in VALID_WORDINGS else 'Standard'
     api_key = str(data.get('api_key') or '').strip() or os.getenv('NVIDIA_API_KEY', '').strip()
-    return topic, length, level, api_key
+    return topic, length, level, wording, api_key
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -158,6 +165,8 @@ def inject_account():
         'account': user,
         'account_is_admin': bool(user and auth.is_admin(user.get('email'))),
         'auth_on': auth.auth_enabled(),
+        # The sign-out form in the nav is on every page, so the token has to be too.
+        'csrf_token': auth.csrf_token(),
     }
 
 
@@ -204,7 +213,11 @@ def logout():
     if not auth.csrf_ok():
         return jsonify({'error': 'Invalid request. Please reload the page.'}), 400
     session.clear()
-    return jsonify({'ok': True, 'next': '/login'})
+    # The nav signs out with an ordinary form, so answer one with a redirect
+    # rather than a page full of JSON. Callers that asked for JSON still get it.
+    if request.headers.get('X-CSRF-Token'):
+        return jsonify({'ok': True, 'next': '/login'})
+    return redirect(url_for('login'))
 
 
 def spend_quota(kind):
@@ -452,15 +465,15 @@ def settings():
 
 @app.route('/about')
 def about():
-    """About page"""
-    return render_template('about.html')
+    """About was folded into Settings; the old URL keeps working."""
+    return redirect(url_for('settings') + '#about')
 
-# API Routes
+
 @app.route('/api/generate-text', methods=['POST'])
 def generate_text():
     """Generate text explanation"""
     try:
-        topic, length, level, api_key = read_request()
+        topic, length, level, wording, api_key = read_request()
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -472,7 +485,7 @@ def generate_text():
         over_quota = spend_quota('text')
         if over_quota:
             return over_quota
-        result = call_genai(api_key, topic, length, "Text explanation", level=level)
+        result = call_genai(api_key, topic, length, "Text explanation", level=level, wording=wording)
         
         if result:
             briefing, _, _, _ = result
@@ -491,7 +504,7 @@ def generate_text():
 def generate_code():
     """Generate code with explanation"""
     try:
-        topic, length, level, api_key = read_request()
+        topic, length, level, wording, api_key = read_request()
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -503,7 +516,7 @@ def generate_code():
         over_quota = spend_quota('code')
         if over_quota:
             return over_quota
-        result = call_genai(api_key, topic, length, "Code with explanation", level=level)
+        result = call_genai(api_key, topic, length, "Code with explanation", level=level, wording=wording)
         
         if result:
             briefing, code_content, _, _ = result
@@ -537,7 +550,7 @@ def generate_code():
 def generate_audio():
     """Generate audio explanation"""
     try:
-        topic, length, level, api_key = read_request()
+        topic, length, level, wording, api_key = read_request()
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -549,7 +562,7 @@ def generate_audio():
         over_quota = spend_quota('audio')
         if over_quota:
             return over_quota
-        result = call_genai(api_key, topic, length, "Audio", level=level)
+        result = call_genai(api_key, topic, length, "Audio", level=level, wording=wording)
         
         if result:
             briefing, _, audio_script, _ = result
@@ -580,7 +593,7 @@ def generate_audio():
 def generate_images_api():
     """Generate images for visualization"""
     try:
-        topic, length, level, api_key = read_request()
+        topic, length, level, wording, api_key = read_request()
         
         if not topic:
             return jsonify({'error': 'Topic is required'}), 400
@@ -592,7 +605,7 @@ def generate_images_api():
         over_quota = spend_quota('images')
         if over_quota:
             return over_quota
-        result = call_genai(api_key, topic, length, "Image Explanation", level=level)
+        result = call_genai(api_key, topic, length, "Image Explanation", level=level, wording=wording)
         
         if result:
             briefing, _, _, image_prompts = result
@@ -625,6 +638,7 @@ def follow_up():
         context = str(data.get('context') or '')
         history = data.get('history') if isinstance(data.get('history'), list) else []
         level = data.get('level') if data.get('level') in VALID_LEVELS else 'Beginner'
+        wording = data.get('wording') if data.get('wording') in VALID_WORDINGS else 'Standard'
         api_key = str(data.get('api_key') or '').strip() or os.getenv('NVIDIA_API_KEY', '').strip()
 
         if not question:
@@ -635,7 +649,7 @@ def follow_up():
         over_quota = spend_quota('followup')
         if over_quota:
             return over_quota
-        answer = call_followup(api_key, topic, context, history, question, level)
+        answer = call_followup(api_key, topic, context, history, question, level, wording)
         if not answer:
             return jsonify({'error': 'No answer could be generated. Please try again.'}), 502
         return jsonify({'success': True, 'answer': answer})
@@ -651,6 +665,7 @@ def code_sections():
         data = request.get_json(silent=True) or {}
         code = str(data.get('code') or '')[:20000]
         topic = str(data.get('topic') or '').strip()[:300]
+        wording = data.get('wording') if data.get('wording') in VALID_WORDINGS else 'Standard'
         api_key = str(data.get('api_key') or '').strip() or os.getenv('NVIDIA_API_KEY', '').strip()
 
         if not code.strip():
@@ -661,7 +676,7 @@ def code_sections():
         over_quota = spend_quota('sections')
         if over_quota:
             return over_quota
-        sections = explain_code_sections(api_key, code, topic)
+        sections = explain_code_sections(api_key, code, topic, wording)
         if not sections:
             return jsonify({'error': 'No section breakdown could be generated.'}), 502
         return jsonify({'success': True, 'sections': sections})
@@ -674,7 +689,7 @@ def code_sections():
 def quiz():
     """Multiple-choice self-check for a topic, optionally about material already shown."""
     try:
-        topic, _, level, api_key = read_request()
+        topic, _, level, wording, api_key = read_request()
         context = str((request.get_json(silent=True) or {}).get('context') or '')[:6000]
 
         if not topic:
@@ -685,7 +700,7 @@ def quiz():
         over_quota = spend_quota('quiz')
         if over_quota:
             return over_quota
-        result = generate_quiz(api_key, topic, context, level)
+        result = generate_quiz(api_key, topic, context, level, wording)
         if not result['questions']:
             return jsonify({'error': 'No quiz could be generated. Please try again.'}), 502
         return jsonify({'success': True, **result})

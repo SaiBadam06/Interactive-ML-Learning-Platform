@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 currentExplanation = data.content;
                 explanationDiv.innerHTML = formatMarkdown(data.content);
-                outputSection.style.display = 'block';
+                outputSection.hidden = false;
                 outputSection.scrollIntoView({ behavior: 'smooth' });
                 rememberTopic(topic);
                 showToast('Explanation generated successfully!', 'success');

@@ -206,6 +206,19 @@ kbd {
 
 .nav-actions { display: flex; align-items: center; gap: var(--s2); }
 
+/* The sign-out control is a form button that has to sit in the nav as if it
+   were a link - no extra row, no different height. */
+.nav-signout { margin: 0; display: flex; }
+.nav-signout-btn {
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+
+
 .nav-toggle { display: none; }
 
 .nav-backdrop {
@@ -311,7 +324,8 @@ textarea.form-control { min-height: 96px; }
 
 .form-hint { display: block; margin-top: var(--s2); color: var(--ink-muted); font-size: 14px; }
 
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); }
+/* auto-fit so a row takes a third control without a hand-written breakpoint */
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s4); }
 
 .input-large { min-height: 48px; font-size: 17px; }
 
@@ -959,6 +973,126 @@ textarea.form-control { min-height: 96px; }
 /* --- Audio --- */
 
 .audio-player audio { width: 100%; }
+
+/* --- Auth pages (sign in, invite acceptance) ----------------------------- */
+/* Built from tokens only, so dark mode needs no second definition. */
+
+.auth-page { max-width: 30rem; }
+
+.auth-card { margin-top: var(--s5); }
+
+.auth-alert {
+    padding: var(--s3) var(--s4);
+    border-radius: var(--r-ctl);
+    border-left: 3px solid var(--danger);
+    background: var(--surface-2);
+    color: var(--ink);
+    margin-bottom: var(--s4);
+    font-size: 15px;
+}
+.auth-alert.info    { border-left-color: var(--accent); }
+.auth-alert.success { border-left-color: var(--ok); }
+
+/* The message never relies on colour alone - it is always a sentence. */
+.field-error {
+    margin: var(--s2) 0 0;
+    color: var(--danger);
+    font-size: 14px;
+}
+
+.form-control.invalid { border-color: var(--danger); }
+.form-control.invalid:focus-visible { outline-color: var(--danger); }
+
+.link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: inherit;
+}
+.link-button:hover { color: var(--ink); }
+
+.auth-secondary { margin-top: var(--s4); }
+
+.auth-checking { color: var(--ink-muted); }
+
+/* Password strength. Width AND label carry the meaning; the bar is a hint. */
+.pw-meter {
+    height: 4px;
+    margin-top: var(--s2);
+    border-radius: 2px;
+    background: var(--surface-2);
+    overflow: hidden;
+}
+.pw-meter span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--ink-muted);
+    transition: width .2s ease, background-color .2s ease;
+}
+.pw-meter.weak   span { width: 25%;  background: var(--danger); }
+.pw-meter.ok     span { width: 50%;  background: var(--syn-number); }
+.pw-meter.good   span { width: 75%;  background: var(--accent); }
+.pw-meter.strong span { width: 100%; background: var(--ok); }
+
+/* --- Admin: accounts ----------------------------------------------------- */
+
+.user-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--s3);
+    padding: var(--s3) 0;
+    border-bottom: 1px solid var(--hairline);
+}
+.user-row:last-child { border-bottom: 0; }
+
+.user-email { font-weight: 500; overflow-wrap: anywhere; }
+.user-meta { color: var(--ink-muted); font-size: 14px; }
+
+/* Rounded rectangles, not pills - a deliberate house rule. */
+.badge {
+    display: inline-block;
+    padding: 2px var(--s2);
+    border-radius: var(--r-chip);
+    border: 1px solid var(--hairline);
+    background: var(--surface-2);
+    color: var(--ink-muted);
+    font-size: 13px;
+    font-weight: 500;
+}
+.badge-admin   { border-color: var(--accent); color: var(--accent); }
+.badge-pending { border-color: var(--syn-number); color: var(--syn-number); }
+
+/* The invite link is the product, so it is selectable and never truncated
+   out of reach. */
+.copy-field { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
+.copy-field input {
+    flex: 1 1 20rem;
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+.danger-text { color: var(--danger); }
+
+/* --- Error pages --------------------------------------------------------- */
+
+.error-page { max-width: 40rem; }
+
+/* The number is a landmark, not the message - the sentence under it does the
+   work, so the digits stay quiet rather than filling the screen. */
+.error-code {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--accent);
+    margin: 0 0 var(--s2);
+}
+.error-code-bad { color: var(--danger); }
 
 /* ---------- 7. Utilities ------------------------------------------------- */
 

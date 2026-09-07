@@ -48,6 +48,28 @@ AUDIENCE = {
 }
 
 
+# How hard the sentences are, which is a separate question from how much theory
+# the reader gets. A learner can want the Advanced material and still not want to
+# fight through dense academic prose - especially reading in a second language.
+# Kept orthogonal to AUDIENCE on purpose: every combination is legitimate.
+WORDING = {
+    "Simple": (
+        "Language: plain and easy to read.\n"
+        "- Keep sentences short, about fifteen words, with one idea in each.\n"
+        # Same trap as the Beginner audience block: asking for definitions without
+        # saying where they go produced a bolded glossary and broke the no-markdown
+        # rule, so pin the placement and forbid the formatting here too.
+        "- Use everyday words. When a technical word cannot be avoided, say what it "
+        "means in ordinary language in the same sentence. Do not write a glossary "
+        "and do not bold the term.\n"
+        "- Write in the active voice and speak to the reader as \"you\".\n"
+        "- Prefer a concrete example of what happens over an abstract description "
+        "of what could happen.\n"
+    ),
+    "Standard": "",
+}
+
+
 def _chat(api_key, messages, model, max_tokens=4096, temperature=0.7):
     """One NIM chat call. Returns the content string, or None on failure."""
     headers = {
@@ -81,11 +103,13 @@ def _chat(api_key, messages, model, max_tokens=4096, temperature=0.7):
     return None
 
 
-def call_followup(api_key, topic, context, history, question, level="Beginner"):
+def call_followup(api_key, topic, context, history, question, level="Beginner",
+                  wording="Standard"):
     """Answer a follow-up question about material the learner was just shown."""
     system = (
         f"You are a patient tutor. The learner is studying: {topic or 'a computer science topic'}.\n"
         f"{AUDIENCE.get(level, AUDIENCE['Beginner'])}\n"
+        f"{WORDING.get(wording, '')}"
         "Here is the material they were shown:\n\n"
         f"{context[:6000]}\n\n"
         "Answer follow-up questions about this material concretely and briefly. "
@@ -103,7 +127,7 @@ def call_followup(api_key, topic, context, history, question, level="Beginner"):
             return answer
     return None
 
-def explain_code_sections(api_key, code, topic=None):
+def explain_code_sections(api_key, code, topic=None, wording="Standard"):
     """
     Split a generated program into consecutive sections and explain each one.
 
@@ -130,7 +154,11 @@ def explain_code_sections(api_key, code, topic=None):
         '"explanation": "what this whole section does and why it is needed, 2-4 sentences"}\n\n'
         "Rules: cover the program in order from line 1 to the last line with no gaps and no "
         "overlaps; use the line numbers exactly as shown; do not include the code itself in "
-        "the JSON; write explanations in plain sentence case with no markdown."
+        "the JSON; write explanations in plain sentence case with no markdown.\n"
+        # The wording block only ever constrains the "explanation" strings; the JSON
+        # shape above is fixed and is not up for rephrasing.
+        + (("\nWrite each explanation this way:\n" + WORDING[wording])
+           if WORDING.get(wording) else "")
     )
 
     lines = code.splitlines()
@@ -184,7 +212,7 @@ def explain_code_sections(api_key, code, topic=None):
     return []
 
 
-def generate_quiz(api_key, topic, context="", level="Beginner"):
+def generate_quiz(api_key, topic, context="", level="Beginner", wording="Standard"):
     """
     Multiple-choice questions plus key terms for material the learner just read.
 
@@ -199,6 +227,8 @@ def generate_quiz(api_key, topic, context="", level="Beginner"):
     prompt = (
         f"Write a short self-check quiz on: {topic}\n"
         f"The learner is at {level} level; pitch the questions there.\n"
+        # Applies to the questions, options and explanations - not to the JSON keys.
+        + (WORDING[wording] if WORDING.get(wording) else "")
     )
     if context:
         prompt += (
@@ -383,7 +413,8 @@ def _strip_markdown(text):
     return re.sub(r"(?m)^#{2,6}[ \t]+", "", text)
 
 
-def call_genai(api_key, topic, length, mode, previous_attempts=None, level="Beginner"):
+def call_genai(api_key, topic, length, mode, previous_attempts=None, level="Beginner",
+               wording="Standard"):
     """
     Call NVIDIA NIM to generate ML learning content
 
@@ -398,7 +429,7 @@ def call_genai(api_key, topic, length, mode, previous_attempts=None, level="Begi
     Returns:
         Tuple of (briefing, code_content, audio_script, image_prompts)
     """
-    audience = AUDIENCE.get(level, AUDIENCE["Beginner"])
+    audience = AUDIENCE.get(level, AUDIENCE["Beginner"]) + WORDING.get(wording, "")
     # Enhanced prompt construction
     base_prompt = f"""
 You are an expert educational tutor providing content for topics related to Computer Science, Software Development, Technology, Artificial Intelligence (AI), Machine Learning (ML), and Deep Learning (DL).

@@ -42,28 +42,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Display explanation
                 explanationDiv.innerHTML = formatMarkdown(data.explanation);
                 
-                // Display images
+                // Built with DOM APIs, not innerHTML: the prompts are model output
+                // and the image sources come back from the same response, so
+                // neither is trusted enough to be parsed as markup.
+                imagesGrid.textContent = '';
                 if (data.images && data.images.length > 0) {
-                    imagesGrid.innerHTML = data.images.map((img, idx) => `
-                        <div class="image-item">
-                            <img src="${img}" alt="Visualization ${idx + 1}" loading="lazy">
-                        </div>
-                    `).join('');
+                    data.images.forEach((img, idx) => {
+                        const item = document.createElement('div');
+                        item.className = 'image-item';
+                        const el = document.createElement('img');
+                        el.src = img;
+                        el.alt = 'Visualization ' + (idx + 1);
+                        el.loading = 'lazy';
+                        item.appendChild(el);
+                        imagesGrid.appendChild(item);
+                    });
                 } else {
-                    imagesGrid.innerHTML = '<p>No images were generated. Please try again.</p>';
+                    const empty = document.createElement('p');
+                    empty.textContent = 'No images were generated. Please try again.';
+                    imagesGrid.appendChild(empty);
                 }
-                
+
                 // Display prompts
+                promptsDiv.textContent = '';
                 if (data.prompts && data.prompts.length > 0) {
-                    promptsDiv.innerHTML = data.prompts.map((prompt, idx) => `
-                        <div class="prompt-item">
-                            <div class="prompt-number">Prompt ${idx + 1}:</div>
-                            <div class="prompt-text">${prompt}</div>
-                        </div>
-                    `).join('');
+                    data.prompts.forEach((prompt, idx) => {
+                        const item = document.createElement('div');
+                        item.className = 'prompt-item';
+                        const number = document.createElement('div');
+                        number.className = 'prompt-number';
+                        number.textContent = 'Prompt ' + (idx + 1) + ':';
+                        const text = document.createElement('div');
+                        text.className = 'prompt-text';
+                        text.textContent = prompt;
+                        item.append(number, text);
+                        promptsDiv.appendChild(item);
+                    });
                 }
                 
-                outputSection.style.display = 'block';
+                outputSection.hidden = false;
                 outputSection.scrollIntoView({ behavior: 'smooth' });
                 rememberTopic(topic);
                 showToast('Images generated successfully!', 'success');

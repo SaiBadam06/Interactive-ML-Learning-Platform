@@ -61,6 +61,24 @@
                        {% if request.endpoint == endpoint %}aria-current="page"{% endif %}>{{ label }}</a></li>
                 {% endfor %}
                 <!-- auth:start -->
+                {% if auth_on %}
+                    {% if account %}
+                        {% if account_is_admin %}
+                        <li><a href="{{ url_for('admin_users') }}" class="nav-link"
+                               {% if request.endpoint == 'admin_users' %}aria-current="page"{% endif %}>Accounts</a></li>
+                        {% endif %}
+                        <li>
+                            <!-- An ordinary form, so signing out does not depend on JavaScript. -->
+                            <form method="post" action="{{ url_for('logout') }}" class="nav-signout">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit" class="nav-link nav-signout-btn"
+                                        title="Signed in as {{ account.email }}">Sign out</button>
+                            </form>
+                        </li>
+                    {% elif request.endpoint != 'login' %}
+                        <li><a href="{{ url_for('login') }}" class="nav-link">Sign in</a></li>
+                    {% endif %}
+                {% endif %}
                 <!-- auth:end -->
             </ul>
         </div>
