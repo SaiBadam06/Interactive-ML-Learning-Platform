@@ -21,6 +21,55 @@ DEFAULT_MODELS = [NIM_TEXT_MODEL, NIM_CODE_MODEL]
 NIM_MODELS = {}
 
 
+# What "explain it for me" means at each level. The same topic needs a different
+# explanation for a first-year student and for someone teaching it.
+AUDIENCE = {
+    "Beginner": (
+        "Audience: a complete beginner.\n"
+        "- Open with an everyday analogy before any technical detail.\n"
+        # "Define every term" on its own produced a bolded glossary ("- **Algorithm**: ...")
+        # and broke the no-markdown rule, so say where the definition goes.
+        "- Explain every technical term in plain words the first time it appears, inside the "
+        "sentence itself. Do not write a glossary and do not bold the term.\n"
+        "- Avoid equations unless one is essential; when you use one, explain every symbol in words.\n"
+    ),
+    "Intermediate": (
+        "Audience: someone who already has basic machine learning vocabulary.\n"
+        "- Assume terms like feature, label, loss and gradient are understood.\n"
+        "- Include the key equation and explain what each symbol stands for.\n"
+        "- Include one worked example with concrete numbers.\n"
+    ),
+    "Advanced": (
+        "Audience: an advanced practitioner.\n"
+        "- Be mathematically precise and state the assumptions the method relies on.\n"
+        "- Cover failure modes and computational complexity.\n"
+        "- Relate the method to neighbouring methods and say when each is preferable.\n"
+    ),
+}
+
+
+# How hard the sentences are, which is a separate question from how much theory
+# the reader gets. A learner can want the Advanced material and still not want to
+# fight through dense academic prose - especially reading in a second language.
+# Kept orthogonal to AUDIENCE on purpose: every combination is legitimate.
+WORDING = {
+    "Simple": (
+        "Language: plain and easy to read.\n"
+        "- Keep sentences short, about fifteen words, with one idea in each.\n"
+        # Same trap as the Beginner audience block: asking for definitions without
+        # saying where they go produced a bolded glossary and broke the no-markdown
+        # rule, so pin the placement and forbid the formatting here too.
+        "- Use everyday words. When a technical word cannot be avoided, say what it "
+        "means in ordinary language in the same sentence. Do not write a glossary "
+        "and do not bold the term.\n"
+        "- Write in the active voice and speak to the reader as \"you\".\n"
+        "- Prefer a concrete example of what happens over an abstract description "
+        "of what could happen.\n"
+    ),
+    "Standard": "",
+}
+
+
 def _chat(api_key, messages, model, max_tokens=4096, temperature=0.7):
     """One NIM chat call. Returns the content string, or None on failure."""
     headers = {
@@ -54,10 +103,13 @@ def _chat(api_key, messages, model, max_tokens=4096, temperature=0.7):
     return None
 
 
-def call_followup(api_key, topic, context, history, question):
+def call_followup(api_key, topic, context, history, question, level="Beginner",
+                  wording="Standard"):
     """Answer a follow-up question about material the learner was just shown."""
     system = (
         f"You are a patient tutor. The learner is studying: {topic or 'a computer science topic'}.\n"
+        f"{AUDIENCE.get(level, AUDIENCE['Beginner'])}\n"
+        f"{WORDING.get(wording, '')}"
         "Here is the material they were shown:\n\n"
         f"{context[:6000]}\n\n"
         "Answer follow-up questions about this material concretely and briefly. "
@@ -75,7 +127,7 @@ def call_followup(api_key, topic, context, history, question):
             return answer
     return None
 
-def explain_code_sections(api_key, code, topic=None):
+def explain_code_sections(api_key, code, topic=None, wording="Standard"):
     """
     Split a generated program into consecutive sections and explain each one.
 
@@ -102,7 +154,11 @@ def explain_code_sections(api_key, code, topic=None):
         '"explanation": "what this whole section does and why it is needed, 2-4 sentences"}\n\n'
         "Rules: cover the program in order from line 1 to the last line with no gaps and no "
         "overlaps; use the line numbers exactly as shown; do not include the code itself in "
-        "the JSON; write explanations in plain sentence case with no markdown."
+        "the JSON; write explanations in plain sentence case with no markdown.\n"
+        # The wording block only ever constrains the "explanation" strings; the JSON
+        # shape above is fixed and is not up for rephrasing.
+        + (("\nWrite each explanation this way:\n" + WORDING[wording])
+           if WORDING.get(wording) else "")
     )
 
     lines = code.splitlines()
@@ -154,6 +210,101 @@ def explain_code_sections(api_key, code, topic=None):
         logger.warning(f"{model} produced too few usable sections; trying next model")
 
     return []
+
+
+def generate_quiz(api_key, topic, context="", level="Beginner", wording="Standard"):
+    """
+    Multiple-choice questions plus key terms for material the learner just read.
+
+    Same contract as explain_code_sections: ask for ONE JSON object, pull it out
+    with a regex, validate every field, and drop anything malformed. A quiz whose
+    answer key is wrong is worse than no quiz, so a question survives only with
+    exactly four options and an answer index that actually points at one of them.
+
+    Returns {"questions": [...], "key_terms": [...]}; both lists empty on failure,
+    which the page treats as "the quiz could not be generated".
+    """
+    prompt = (
+        f"Write a short self-check quiz on: {topic}\n"
+        f"The learner is at {level} level; pitch the questions there.\n"
+        # Applies to the questions, options and explanations - not to the JSON keys.
+        + (WORDING[wording] if WORDING.get(wording) else "")
+    )
+    if context:
+        prompt += (
+            "\nThey have just read this material, so base the questions on it and, where "
+            "code appears, ask what a specific line or parameter does:\n\n"
+            f"{context[:6000]}\n"
+        )
+    prompt += (
+        "\nReply with ONLY a JSON object, no prose before or after it:\n"
+        '{"questions": [{"question": "...", "options": ["a", "b", "c", "d"], '
+        '"answer": <index 0-3 of the correct option>, "explanation": "why that answer is '
+        'right, 1-2 sentences"}], '
+        '"key_terms": [{"term": "...", "definition": "one sentence"}]}\n\n'
+        "Rules: 3 to 6 questions; exactly four options each; mix conceptual questions with "
+        "concrete ones; up to 8 key terms; plain sentence case with no markdown."
+    )
+
+    # The code model first: quizzes are short and it answers in a few seconds.
+    for model in (NIM_CODE_MODEL, NIM_TEXT_MODEL):
+        raw = _chat(api_key, [{"role": "user", "content": prompt}], model, max_tokens=2500)
+        if not raw:
+            continue
+
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not match:
+            logger.warning(f"{model} returned no JSON object for the quiz")
+            continue
+        try:
+            parsed = json.loads(match.group(0))
+        except json.JSONDecodeError as e:
+            logger.warning(f"{model} returned unparseable quiz JSON: {e}")
+            continue
+        if not isinstance(parsed, dict):
+            continue
+
+        questions = []
+        for item in parsed.get("questions") or []:
+            if not isinstance(item, dict):
+                continue
+            options = item.get("options")
+            if not isinstance(options, list) or len(options) != 4:
+                continue
+            options = [str(o).strip() for o in options]
+            if not all(options):
+                continue
+            # bool is an int subclass and would sneak through as index 0/1.
+            answer = item.get("answer")
+            if isinstance(answer, bool) or not isinstance(answer, int) or not 0 <= answer <= 3:
+                continue
+            question = str(item.get("question") or "").strip()
+            explanation = str(item.get("explanation") or "").strip()
+            if not question or not explanation:
+                continue
+            questions.append({"question": question, "options": options,
+                              "answer": answer, "explanation": explanation})
+            if len(questions) == 6:
+                break
+
+        if not questions:
+            logger.warning(f"{model} produced no usable quiz questions; trying next model")
+            continue
+
+        key_terms = []
+        for item in parsed.get("key_terms") or []:
+            if not isinstance(item, dict):
+                continue
+            term = str(item.get("term") or "").strip()[:60]
+            definition = str(item.get("definition") or "").strip()
+            if term and definition:
+                key_terms.append({"term": term, "definition": definition})
+            if len(key_terms) == 8:
+                break
+
+        return {"questions": questions, "key_terms": key_terms}
+
+    return {"questions": [], "key_terms": []}
 
 
 def _code_smells(code):
@@ -244,20 +395,41 @@ def _extract_code(text):
     return "", text
 
 
-def call_genai(api_key, topic, length, mode, previous_attempts=None):
+def _strip_markdown(text):
+    """
+    Remove the two markdown constructs the models still emit despite being told
+    not to, so the page never shows raw "**" or "###" to a learner.
+
+    The prompt forbids markdown and mostly that holds, but asking for every term
+    to be defined reliably produces a bolded glossary ("- **Algorithm**: ...").
+    Instructions did not fix it; deleting the markers does.
+
+    Only markers that sit at a word boundary and wrap non-space text on one line
+    are unwrapped, so a Python exponent quoted in a walkthrough survives whether
+    it is written "2 ** 3" or "x**2 and y**3". Only headings of two or more
+    hashes are stripped, because a single "# " is a code comment.
+    """
+    text = re.sub(r"(?<![\w*])\*\*(\S(?:[^*\n]*\S)?)\*\*(?![\w*])", r"\1", text)
+    return re.sub(r"(?m)^#{2,6}[ \t]+", "", text)
+
+
+def call_genai(api_key, topic, length, mode, previous_attempts=None, level="Beginner",
+               wording="Standard"):
     """
     Call NVIDIA NIM to generate ML learning content
-    
+
     Args:
         api_key: NVIDIA NIM API key (nvapi-...)
         topic: ML topic to explain
         length: Length of explanation (Brief, Detailed, Comprehensive)
         mode: Output mode (Text explanation, Code with explanation, Audio, Image Explanation)
         previous_attempts: Previous attempts (for retry logic)
-    
+        level: Who it is for (Beginner, Intermediate, Advanced) - see AUDIENCE
+
     Returns:
         Tuple of (briefing, code_content, audio_script, image_prompts)
     """
+    audience = AUDIENCE.get(level, AUDIENCE["Beginner"]) + WORDING.get(wording, "")
     # Enhanced prompt construction
     base_prompt = f"""
 You are an expert educational tutor providing content for topics related to Computer Science, Software Development, Technology, Artificial Intelligence (AI), Machine Learning (ML), and Deep Learning (DL).
@@ -271,6 +443,7 @@ Topic: "{topic}"
 Required format: {mode}
 Explanation depth: {length}
 
+{audience}
 Teaching Guidelines:
 - Start with a clear learning objective
 - Provide structured explanations with examples
@@ -415,7 +588,63 @@ After the written explanation, output 2-3 image prompts. Each one must start on 
             image_prompts = [p.strip() for p in briefing[first_marker_pos:].split(marker) if p.strip()]
             briefing = briefing[:first_marker_pos].strip()
 
-        return briefing, code_content, audio_script, image_prompts
+        # Prose only: code_content is already out of `briefing` by this point.
+        return _strip_markdown(briefing), code_content, _strip_markdown(audio_script), image_prompts
 
     logger.error(f"All models failed for mode '{mode}'")
     return None
+
+
+# ============================== Streaming ==============================
+# The chat surface lives or dies on time-to-first-word. A non-streaming call
+# leaves a spinner up for 15-90 s; streaming puts words on screen in about a
+# second, which is the whole reason the chat interface is worth having.
+
+def stream_chat(api_key, messages, model=None, max_tokens=4096, temperature=0.7):
+    """Yield ("thinking" | "content", text) as the model produces it.
+
+    Two things are deliberate here:
+
+    * ``chat_template_kwargs={"thinking": False}`` is NOT sent. It works for a
+      normal call, but on the streaming endpoint it suppresses the answer
+      entirely - measured: 1926 characters of reasoning and zero of content.
+      The scratchpad is separated here instead, and the caller decides whether
+      to show it.
+    * Reasoning arrives as ``delta.reasoning_content`` and the answer as
+      ``delta.content``. They are kept apart so the scratchpad can never be
+      mistaken for the lesson.
+    """
+    model = model or NIM_TEXT_MODEL
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": True,
+    }
+    response = requests.post(
+        NIM_CHAT_URL,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json=payload, stream=True, timeout=(10, 180),
+    )
+    if response.status_code != 200:
+        logger.error("stream_chat %s failed: HTTP %s", model, response.status_code)
+        raise RuntimeError(f"model returned {response.status_code}")
+
+    for raw in response.iter_lines():
+        if not raw:
+            continue
+        line = raw.decode("utf-8", "replace")
+        if not line.startswith("data: "):
+            continue
+        body = line[6:].strip()
+        if body == "[DONE]":
+            break
+        try:
+            delta = ((json.loads(body).get("choices") or [{}])[0].get("delta") or {})
+        except (ValueError, IndexError, AttributeError):
+            continue                       # a malformed frame is not fatal
+        if delta.get("reasoning_content"):
+            yield "thinking", delta["reasoning_content"]
+        if delta.get("content"):
+            yield "content", delta["content"]

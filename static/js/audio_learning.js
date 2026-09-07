@@ -16,14 +16,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const topic = document.getElementById('topic').value.trim();
         const length = document.getElementById('length').value;
+        const level = document.getElementById('level').value;
 
         if (!topic) {
-            showToast('Please enter a topic', 'error');
+            showToast('Name a topic first.', 'error');
             return;
         }
         
         try {
-            showLoading(true);
+            showLoading(true, 'Writing and recording your audio lesson - usually 30-60 s');
             
             const response = await fetch('/api/generate-audio', {
                 method: 'POST',
@@ -32,7 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     topic,
-                    length
+                    length,
+                    level
                 })
             });
             
@@ -54,26 +56,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.audio_file) {
                     currentAudioFile = data.audio_file;
                     currentAudioData = data.audio_data || null;
-                    audioPlayer.innerHTML = `
-                        <audio controls>
-                            <source src="${data.audio_data || ('/api/download-audio/' + data.audio_file)}" type="audio/mpeg">
-                            Your browser does not support the audio element.
-                        </audio>
-                    `;
+                    // DOM APIs rather than innerHTML: the filename comes back from
+                    // the response and must not be parsed as markup.
+                    audioPlayer.textContent = '';
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = data.audio_data || ('/api/download-audio/' + encodeURIComponent(data.audio_file));
+                    audio.append('Your browser does not support the audio element.');
+                    audioPlayer.appendChild(audio);
                 } else {
-                    audioPlayer.innerHTML = '<p>Audio generation failed. Please try again.</p>';
+                    audioPlayer.textContent = '';
+                    const failed = document.createElement('p');
+                    failed.textContent = 'Audio generation failed. Please try again.';
+                    audioPlayer.appendChild(failed);
                 }
                 
-                outputSection.style.display = 'block';
+                outputSection.hidden = false;
                 outputSection.scrollIntoView({ behavior: 'smooth' });
-                showToast('Audio lesson generated successfully!', 'success');
+                rememberTopic(topic);
+                showToast('Your audio lesson is ready.', 'success');
             } else {
                 throw new Error('Failed to generate content');
             }
             
         } catch (error) {
             console.error('Error:', error);
-            showToast(error.message || 'An error occurred', 'error');
+            showToast(error.message || 'That did not work. Try again in a moment.', 'error');
         } finally {
             showLoading(false);
         }
@@ -90,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 window.location.href = `/api/download-audio/${currentAudioFile}`;
             }
-            showToast('Downloading audio file...', 'info');
+            showToast('Saving the audio file.', 'info');
         }
     });
     

@@ -1,115 +1,166 @@
 {% extends "base.html" %}
 
-{% block title %}Image Visualization - ML Learning Assistant{% endblock %}
+{% block title %}Images - GyanGuru{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container container-wide">
     <div class="page-header">
-        <h1><i class="fas fa-image"></i> Image Visualization</h1>
-        <p>Generate AI-powered visual diagrams and illustrations to understand ML concepts intuitively</p>
+        <h1>Images</h1>
+        <p>Diagrams of an ML idea, with the prompts that drew them and a written explanation to read alongside.</p>
     </div>
 
-    <div class="content-wrapper">
-        <!-- Input Section -->
-        <div class="input-section card">
-            <h2>What would you like to visualize?</h2>
-            
-            <form id="imageForm">
-                <div class="form-group">
-                    <label for="topic">
-                        <i class="fas fa-lightbulb"></i> Machine Learning Topic
-                    </label>
-                    <input 
-                        type="text" 
-                        id="topic" 
-                        name="topic" 
-                        class="form-control" 
-                        placeholder="e.g., convolutional neural network architecture, decision tree, clustering"
-                        required
-                    >
-                    <small class="form-hint">Enter any ML concept you want to see visualized</small>
-                </div>
+    <div class="card">
+        <form id="imageForm">
+            <div class="form-group">
+                <label for="topic">What should the diagram show?</label>
+                <input type="text" id="topic" name="topic" class="form-control input-large"
+                       placeholder="e.g. convolutional neural network architecture, decision tree, k-means clustering" required>
+                <small class="form-hint">Name the concept or architecture you want drawn.</small>
+            </div>
 
-                <div class="form-group">
-                    <label for="length">
-                        <i class="fas fa-sliders-h"></i> Detail Level
-                    </label>
-                    <select id="length" name="length" class="form-control">
-                        <option value="Brief">Brief - Simple diagrams</option>
-                        <option value="Detailed" selected>Detailed - Comprehensive visuals</option>
-                        <option value="Comprehensive">Comprehensive - Technical illustrations</option>
-                    </select>
-                </div>
+            <div class="chip-row mt-4 recent-topics" id="recentTopics" hidden></div>
 
-                <button type="submit" class="btn btn-primary btn-large">
-                    <i class="fas fa-rocket"></i> Generate Images
-                </button>
-            </form>
+            <div class="form-row mt-4">
+                <fieldset class="segmented">
+                    <legend>Explain for</legend>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Beginner" checked><span>Beginner</span></label>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Intermediate"><span>Intermediate</span></label>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Advanced"><span>Advanced</span></label>
+                </fieldset>
+                <fieldset class="segmented">
+                    <legend>Detail</legend>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Brief"><span>Simple</span></label>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Detailed" checked><span>Detailed</span></label>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Comprehensive"><span>Technical</span></label>
+                </fieldset>
+                <fieldset class="segmented">
+                    <legend>Wording</legend>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Simple"><span>Simple</span></label>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Standard" checked><span>Standard</span></label>
+                </fieldset>
+            </div>
+            <p class="form-hint">
+                "Explain for" sets how much theory you get. "Wording" sets how hard the
+                sentences are - pick Simple for short sentences and everyday words. It is
+                remembered on every page.
+            </p>
+            <input type="hidden" id="level" value="Beginner">
+            <input type="hidden" id="length" value="Detailed">
+
+            <button type="submit" class="btn btn-primary btn-large mt-4">Generate diagrams</button>
+        </form>
+    </div>
+
+    <details class="disclosure mt-5">
+        <summary>Getting a diagram worth keeping</summary>
+        <div class="disclosure-body">
+            <p>Three images are drawn per topic, so ask for something a picture can actually carry.</p>
+            <ul>
+                <li>Name a structure or a flow, such as "encoder-decoder attention" or "how a gradient moves back through two layers", rather than a definition.</li>
+                <li>Say the shape you want: architecture, decision boundary, data flow, before and after.</li>
+                <li>Pick a simpler detail level for something you will redraw by hand, a technical one for a figure closer to a textbook.</li>
+                <li>If a run misses, reword the topic and generate again. Each run takes about half a minute.</li>
+            </ul>
+            <div class="callout callout-warn">
+                An image model draws text as shapes, so labels, axis numbers and formulas in these
+                diagrams are often wrong even when the layout is right. Read the explanation for the
+                facts and treat the picture as a sketch of the structure.
+            </div>
+        </div>
+    </details>
+
+    <!-- Skeleton in the shape of the coming result. The page stays usable. -->
+    <div class="skeleton card mt-5" id="skeleton" hidden aria-hidden="true">
+        <div class="skeleton-head">
+            <span id="loadingMessage">Drawing the diagrams</span>
+            <span id="loadingElapsed"></span>
+        </div>
+        <div class="skeleton-bars">
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+        </div>
+    </div>
+
+    <!-- image_visualization.js reveals this with style.display, so it hides the same way. -->
+    <div id="outputSection" class="mt-5" hidden>
+        <div class="results-head">
+            <h2 class="results-title" id="resultsTitle">Your diagrams</h2>
+            <div class="card-actions">
+                <span class="results-meta" id="resultsMeta"></span>
+                <button id="downloadLessonBtn" class="btn btn-outline" type="button">Download lesson</button>
+            </div>
         </div>
 
-        <!-- Output Section -->
-        <div id="outputSection" class="output-section" style="display: none;">
+        <div class="chip-row continue-row" id="continueRow" data-current="images" hidden></div>
+
+        <!-- Results tabs. The follow-up card below is deliberately NOT a tab. -->
+        <div class="tabs mt-4" id="resultTabs">
+            <div class="tablist" role="tablist" aria-label="Results">
+                <button class="tab" role="tab" id="tab-diagrams" data-tab="diagrams"
+                        aria-controls="panel-diagrams" aria-selected="true">Diagrams</button>
+                <button class="tab" role="tab" id="tab-explanation" data-tab="explanation"
+                        aria-controls="panel-explanation" aria-selected="false" tabindex="-1">Explanation</button>
+                <button class="tab" role="tab" id="tab-prompts" data-tab="prompts"
+                        aria-controls="panel-prompts" aria-selected="false" tabindex="-1">Prompts</button>
+                <button class="tab" role="tab" id="tab-practice" data-tab="practice"
+                        aria-controls="panel-practice" aria-selected="false" tabindex="-1">Practice</button>
+            </div>
+
+            <!-- Diagrams -->
+            <div class="tabpanel" role="tabpanel" id="panel-diagrams" aria-labelledby="tab-diagrams" tabindex="0">
+                <div class="card card--primary">
+                    <div class="card-head"><h2>The diagrams</h2></div>
+                    <p class="section-hint">Open one in a new tab for full size, or save it straight from there.</p>
+                    <div id="imagesGrid" class="images-grid"></div>
+                </div>
+            </div>
+
             <!-- Explanation -->
-            <div class="card">
-                <div class="output-header">
-                    <h2><i class="fas fa-file-alt"></i> Explanation</h2>
-                </div>
-                <div id="explanation" class="explanation-content"></div>
-            </div>
-
-            <!-- Images -->
-            <div class="card">
-                <div class="output-header">
-                    <h2><i class="fas fa-images"></i> Generated Visualizations</h2>
-                </div>
-                
-                <div id="imagesGrid" class="images-grid">
-                    <!-- Images will be dynamically inserted here -->
+            <div class="tabpanel" role="tabpanel" id="panel-explanation" aria-labelledby="tab-explanation" tabindex="0" hidden>
+                <div class="card">
+                    <div class="card-head"><h2>What the diagrams show</h2></div>
+                    <p class="section-hint">The concept in words, written for the level you picked.</p>
+                    <div id="explanation" class="explanation-content"></div>
                 </div>
             </div>
 
-            <!-- Image Prompts -->
-            <div class="card">
-                <div class="output-header">
-                    <h2><i class="fas fa-comment-dots"></i> Image Prompts Used</h2>
+            <!-- Prompts -->
+            <div class="tabpanel" role="tabpanel" id="panel-prompts" aria-labelledby="tab-prompts" tabindex="0" hidden>
+                <div class="card">
+                    <div class="card-head"><h2>Prompts used</h2></div>
+                    <p class="section-hint">What the image model was asked for. Reword one and run again if you want a different picture.</p>
+                    <div id="prompts" class="prompts-content"></div>
                 </div>
-                <div id="prompts" class="prompts-content"></div>
             </div>
-        
-            <!-- Ask a follow-up -->
-            <div class="card follow-up-card">
-                <div class="follow-up" id="followUp">
-                    <h3><i class="fas fa-comments"></i> Ask a follow-up</h3>
-                    <p class="follow-up-hint">Stuck on a step? Ask about anything above.</p>
-                    <div id="followUpThread" class="follow-up-thread"></div>
-                    <form id="followUpForm" class="follow-up-form" autocomplete="off">
-                        <input type="text" id="followUpInput" class="form-control" maxlength="500" required
-                               placeholder="e.g. What should this diagram show?   Explain the flow between the stages">
-                        <button type="submit" class="btn btn-primary">Ask</button>
-                    </form>
+
+            <!-- Practice -->
+            <div class="tabpanel" role="tabpanel" id="panel-practice" aria-labelledby="tab-practice" tabindex="0" hidden>
+                <div class="card" id="quizCard" data-context-ids="explanation" data-tab="tab-practice">
+                    <div class="card-head">
+                        <h2>Check your understanding</h2>
+                        <div class="card-actions">
+                            <button id="quizGenerateBtn" class="btn btn-primary" type="button">Generate quiz</button>
+                        </div>
+                    </div>
+                    <p class="section-hint">Key terms and a few questions on the explanation. Answers are checked as you go.</p>
+                    <div id="quizContent" role="status" aria-live="polite"></div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Visual Learning Tips -->
-    <div class="tips-section">
-        <h3><i class="fas fa-lightbulb"></i> Visual Learning Tips</h3>
-        <div class="tips-grid">
-            <div class="tip-card">
-                <i class="fas fa-eye"></i>
-                <h4>Visual Memory</h4>
-                <p>Images help create lasting mental associations with complex concepts</p>
-            </div>
-            <div class="tip-card">
-                <i class="fas fa-project-diagram"></i>
-                <h4>Architecture Understanding</h4>
-                <p>Perfect for understanding neural network architectures and data flow</p>
-            </div>
-            <div class="tip-card">
-                <i class="fas fa-share-alt"></i>
-                <h4>Share & Discuss</h4>
-                <p>Use generated diagrams in presentations and study groups</p>
+        <!-- Ask a follow-up: pinned below the panels, visible from every tab. -->
+        <div class="card follow-up-card">
+            <div id="followUp">
+                <h2>Ask a follow-up</h2>
+                <p class="follow-up-hint">Something in a diagram unclear? Ask about anything above. The answer arrives here, so nothing you were reading is hidden.</p>
+                <div id="followUpThread" class="follow-up-thread"></div>
+                <form id="followUpForm" class="follow-up-form" autocomplete="off">
+                    <label class="sr-only" for="followUpInput">Your question</label>
+                    <input type="text" id="followUpInput" class="form-control" maxlength="500" required
+                           placeholder="e.g. What do the arrows between the layers mean?">
+                    <button type="submit" class="btn btn-primary">Ask</button>
+                </form>
             </div>
         </div>
     </div>

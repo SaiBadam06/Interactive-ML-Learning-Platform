@@ -1,177 +1,152 @@
 {% extends "base.html" %}
 
-{% block title %}Settings - ML Learning Assistant{% endblock %}
+{% block title %}Settings - GyanGuru{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="page-header">
-        <h1><i class="fas fa-cog"></i> Settings</h1>
-        <p>Configure your API keys and preferences</p>
+        <h1>Settings</h1>
+        <p>What this tool is, what it runs on, and what it keeps.</p>
     </div>
 
-    <div class="settings-wrapper">
-        <!-- API Keys Section -->
+    <div class="settings-stack">
+        {# 1. Your account. The context processor supplies `account` and
+           `account_is_admin`; the names used here before did not exist, so this
+           card never rendered and Access always claimed login was off. #}
+        {% if account %}
         <div class="card">
-            <div class="card-header">
-                <h2><i class="fas fa-key"></i> API Keys Configuration</h2>
-                <p>API keys are now configured in the .env file on the server</p>
-            </div>
+            <h2>Your account</h2>
+            <dl class="kv">
+                <dt>Signed in as</dt><dd>{{ account.email }}</dd>
+                {% if usage_today is not none %}
+                <dt>Generations today</dt><dd>{{ usage_today }} of {{ usage_limit }}</dd>
+                {% endif %}
+            </dl>
+            {# Signing out changes state, so it is a form post, not a link. #}
+            <form method="post" action="{{ url_for('logout') }}" class="mt-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-outline">Sign out</button>
+            </form>
+        </div>
+        {% endif %}
 
-            <div class="api-config-info">
-                <div class="config-item">
-                    <i class="fas fa-file-code"></i>
-                    <div>
-                        <h4>Configuration File</h4>
-                        <p>API keys are stored in the <code>.env</code> file in the project root directory.</p>
-                    </div>
-                </div>
-
-                <div class="config-item">
-                    <i class="fas fa-microchip"></i>
-                    <div>
-                        <h4>NVIDIA NIM API Key</h4>
-                        <p>Set <code>NVIDIA_API_KEY</code> in the .env file.</p>
-                        <small class="form-hint">
-                            <i class="fas fa-info-circle"></i> Required for all features - one key covers text, code, audio and images.
-                            <a href="https://build.nvidia.com" target="_blank">Get a free API key</a>
-                        </small>
-                    </div>
-                </div>
-
-                <div class="config-item">
-                    <i class="fas fa-code"></i>
-                    <div>
-                        <h4>Example .env Configuration</h4>
-                        <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px; margin-top: 10px;">NVIDIA_API_KEY=nvapi-your_key_here
-SECRET_KEY=your_secret_key_here
-FLASK_ENV=development
-FLASK_DEBUG=True</pre>
-                    </div>
-                </div>
-            </div>
+        {# 2. Access #}
+        <div class="card">
+            <h2>Access</h2>
+            {% if auth_on %}
+                <p>Accounts are on, so saved lessons and usage counts belong to whoever is
+                   signed in. New people get in by invitation only.</p>
+                {% if account_is_admin %}
+                <p><a href="{{ url_for('admin_users') }}">Invite someone or manage accounts</a></p>
+                {% endif %}
+            {% else %}
+                <p>Login is not configured on this deployment. Everything runs anonymously and
+                   nothing is tied to an account. Set the Supabase variables below to turn it on.</p>
+            {% endif %}
         </div>
 
-        <!-- Model Information -->
+        {# 3. Models - where "Powered by NVIDIA NIM" actually belongs. #}
         <div class="card">
-            <div class="card-header">
-                <h2><i class="fas fa-info-circle"></i> Model Information</h2>
-            </div>
-            
-            <div class="model-info">
-                <div class="model-card">
-                    <div class="model-icon text-model-icon">
-                        <i class="fas fa-microchip"></i>
-                    </div>
-                    <h3>Nemotron 3.5 Lightning 30B</h3>
-                    <p>Fast NVIDIA MoE model for text, code and audio script generation</p>
-                    <ul>
-                        <li><i class="fas fa-check"></i> Free to use</li>
-                        <li><i class="fas fa-check"></i> Low latency</li>
-                        <li><i class="fas fa-check"></i> High quality outputs</li>
-                    </ul>
-                </div>
-
-                <div class="model-card">
-                    <div class="model-icon image-icon">
-                        <i class="fas fa-image"></i>
-                    </div>
-                    <h3>FLUX.1-dev</h3>
-                    <p>Generate educational diagrams and visualizations</p>
-                    <ul>
-                        <li><i class="fas fa-check"></i> Fast generation</li>
-                        <li><i class="fas fa-check"></i> Educational focus</li>
-                        <li><i class="fas fa-check"></i> High resolution</li>
-                    </ul>
-                </div>
-
-            </div>
-
-            <button id="modelInfoBtn" class="btn btn-secondary">
-                <i class="fas fa-code"></i> View Technical Details
-            </button>
+            <h2>Models</h2>
+            <dl class="kv" id="modelSummary">
+                <dt>Provider</dt><dd class="muted">Loading…</dd>
+            </dl>
+            <button id="modelInfoBtn" class="btn btn-outline mt-4" type="button">View technical details</button>
         </div>
 
-        <!-- Privacy & Security -->
+        {# 4. How it works #}
         <div class="card">
-            <div class="card-header">
-                <h2><i class="fas fa-shield-alt"></i> Privacy & Security</h2>
-            </div>
-            
-            <div class="privacy-content">
-                <div class="privacy-item">
-                    <i class="fas fa-lock"></i>
-                    <div>
-                        <h4>Local Storage</h4>
-                        <p>Your API keys are stored only in your browser's local storage and never transmitted to our servers.</p>
-                    </div>
-                </div>
-
-                <div class="privacy-item">
-                    <i class="fas fa-user-shield"></i>
-                    <div>
-                        <h4>No Data Collection</h4>
-                        <p>We don't collect, store, or share any of your personal information or learning data.</p>
-                    </div>
-                </div>
-
-                <div class="privacy-item">
-                    <i class="fas fa-code-branch"></i>
-                    <div>
-                        <h4>Open Source</h4>
-                        <p>This project is open source. You can review the code and even host it yourself.</p>
-                    </div>
-                </div>
-            </div>
+            <h2>How it works</h2>
+            <p>You name a topic; a language model writes the lesson; you read, run and question it.
+               Generated code and prose can be wrong, so run it and check it against a source you trust.
+               This is a study aid, not an authority.</p>
+            <ul class="icon-list">
+                <li><i class="fas fa-book" aria-hidden="true"></i>
+                    <span><strong>Text</strong> — a written explanation at the depth and level you pick.</span></li>
+                <li><i class="fas fa-code" aria-hidden="true"></i>
+                    <span><strong>Code</strong> — a working Python program, broken into sections beside the prose
+                          that explains them, run in your browser with Pyodide.</span></li>
+                <li><i class="fas fa-headphones" aria-hidden="true"></i>
+                    <span><strong>Audio</strong> — the same explanation spoken, downloadable as an MP3.</span></li>
+                <li><i class="fas fa-image" aria-hidden="true"></i>
+                    <span><strong>Images</strong> — generated diagrams of the concept, with the prompts used.</span></li>
+            </ul>
         </div>
 
-        <!-- Quick Start Guide -->
+        {# 5. Privacy #}
         <div class="card">
-            <div class="card-header">
-                <h2><i class="fas fa-rocket"></i> Quick Start Guide</h2>
+            <h2>Privacy</h2>
+            <p>Your recently studied topics live in your browser's local storage and never leave it.
+               Programs you run stay in your browser too: Pyodide executes them locally and no code is
+               sent to a server to run.</p>
+            <p>When login is configured, saved lessons and a per-day generation count are stored against
+               your account. The topics you type are sent to the model provider to generate content.
+               There is no analytics, no advertising and no third-party tracking.</p>
+        </div>
+
+        {# 6. Setup #}
+        <div class="card">
+            <h2>Setup</h2>
+            <p>Self-hosting? These are the environment variables read from <code>.env</code>.</p>
+            <ul class="env-list">
+                <li>NVIDIA_API_KEY <span class="muted">— required, free at build.nvidia.com</span></li>
+                <li>SECRET_KEY <span class="muted">— signs the session cookie</span></li>
+                <li>FLASK_ENV, FLASK_DEBUG <span class="muted">— local development only</span></li>
+                <li>SUPABASE_URL, SUPABASE_ANON_KEY <span class="muted">— login and saved lessons</span></li>
+                <li>SUPABASE_SERVICE_ROLE_KEY <span class="muted">— server only, for the admin invite page</span></li>
+                <li>ADMIN_EMAILS, SITE_URL <span class="muted">— who may invite, and where invite links point</span></li>
+            </ul>
+        </div>
+
+        {# 7. About - folded in from the old /about page, which now redirects here. #}
+        <div class="card">
+            <div class="card-head" id="about"><h2>About GyanGuru</h2></div>
+            <p>GyanGuru turns a machine learning topic you name into a lesson you can read, run,
+               listen to and be quizzed on. It is a study aid for people learning ML mostly on their
+               own, and it is free and open source.</p>
+            <ul class="icon-list">
+                <li><i class="fas fa-graduation-cap" aria-hidden="true"></i>
+                    <span><strong>Students</strong> — a second explanation of a lecture that did not land, at the level you actually need.</span></li>
+                <li><i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+                    <span><strong>Practitioners</strong> — a runnable sketch of an algorithm before you commit to a library.</span></li>
+                <li><i class="fas fa-chalkboard-user" aria-hidden="true"></i>
+                    <span><strong>Educators</strong> — a first draft of an example or a quiz to edit into your own material.</span></li>
+            </ul>
+
+            <div class="callout callout-warn mt-4">
+                <strong>Read this before you trust anything here.</strong> Every lesson, diagram and
+                quiz answer is written by a language model, so any of it can be confidently wrong.
+                Run the code, check the claims against your course notes or the library docs, and
+                never cite this page as a source. Generation runs on NVIDIA's free tier, which is
+                rate limited — a request can be slow or fail outright, and trying again in a minute
+                usually clears it.
             </div>
 
-            <div class="quick-start">
-                <div class="step">
-                    <div class="step-number">1</div>
-                    <div class="step-content">
-                        <h4>Get API Keys</h4>
-                        <p>Sign up for a free NVIDIA NIM API key at build.nvidia.com</p>
-                    </div>
+            <details class="disclosure mt-5">
+                <summary>What it runs on</summary>
+                <div class="disclosure-body">
+                    <dl class="kv">
+                        <dt>Text</dt><dd>NVIDIA NIM, free tier</dd>
+                        <dt>Diagrams</dt><dd>FLUX.1-dev by Black Forest Labs, served through NVIDIA NIM</dd>
+                        <dt>Audio</dt><dd>gTTS, Google's text-to-speech</dd>
+                        <dt>Running code</dt><dd>Pyodide, CPython compiled to WebAssembly, in your browser</dd>
+                        <dt>Highlighting</dt><dd>Prism</dd>
+                        <dt>App</dt><dd>Python and Flask, with plain HTML, CSS and JavaScript</dd>
+                        <dt>Accounts</dt><dd>Supabase, only when it is configured</dd>
+                    </dl>
                 </div>
+            </details>
 
-                <div class="step">
-                    <div class="step-number">2</div>
-                    <div class="step-content">
-                        <h4>Configure .env File</h4>
-                        <p>Add your API keys to the .env file in the project root directory</p>
-                    </div>
-                </div>
-
-                <div class="step">
-                    <div class="step-number">3</div>
-                    <div class="step-content">
-                        <h4>Start the Application</h4>
-                        <p>Run the Flask application using <code>python app.py</code></p>
-                    </div>
-                </div>
-
-                <div class="step">
-                    <div class="step-number">4</div>
-                    <div class="step-content">
-                        <h4>Start Learning</h4>
-                        <p>Choose a learning mode and explore AI, ML, and Deep Learning topics!</p>
-                    </div>
-                </div>
-            </div>
+            <p class="mt-5">MIT licensed. Bugs, ideas and pull requests go to
+               <a href="https://github.com/SaiBadam06/Interactive-ML-Learning-Platform" target="_blank" rel="noopener">the repository on GitHub</a>.</p>
         </div>
     </div>
 </div>
 
-<!-- Model Info Modal -->
 <div id="modelModal" class="modal">
     <div class="modal-content">
-        <span class="close">&times;</span>
-        <h2>Technical Model Details</h2>
+        <span class="close" role="button" tabindex="0" aria-label="Close">&times;</span>
+        <h2>Technical model details</h2>
         <pre id="modelDetails" class="model-details-content"></pre>
     </div>
 </div>

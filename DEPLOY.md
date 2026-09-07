@@ -28,11 +28,47 @@ vercel env add NVIDIA_API_KEY preview
 vercel env add NVIDIA_API_KEY development
 ```
 
-Add a Flask session secret too (any long random string):
+### Required, or the deployment refuses to serve
+
+The app **fails closed**. If any of `SUPABASE_URL`, `SUPABASE_ANON_KEY` or
+`SECRET_KEY` is missing, every page returns 503 rather than running without a
+login. That is deliberate: the alternative is a deployment that silently
+publishes every page, the admin console and an unmetered API key because one
+variable was mistyped.
 
 ```bash
-vercel env add SECRET_KEY production
+vercel env add SECRET_KEY production                  # python -c "import secrets; print(secrets.token_hex(32))"
+vercel env add SUPABASE_URL production                # https://<ref>.supabase.co
+vercel env add SUPABASE_ANON_KEY production           # sb_publishable_... (safe in a browser)
+vercel env add SUPABASE_SERVICE_ROLE_KEY production   # sb_secret_...  SERVER ONLY
+vercel env add ADMIN_EMAILS production                # comma-separated, who may invite and delete
+vercel env add SITE_URL production                    # https://your-app.vercel.app - NOT 127.0.0.1
 ```
+
+`SITE_URL` is the address invite and password-reset links come back to. Leave it
+pointing at localhost and every invite you send will be unusable by the person
+receiving it.
+
+Add the same set to `preview` if you want preview deployments to work; they fail
+closed too.
+
+### Two variables that must never be set in production
+
+| Variable | What it does | Why it is dangerous |
+|---|---|---|
+| `AUTH_OPTIONAL` | Runs the app without login | The whole point of the fail-closed check. It is ignored when `VERCEL` is set, so it cannot take effect on a deployment even by accident - but do not add it. |
+| `INSECURE_COOKIES` | Drops the `Secure` flag on the session cookie | For local http development only. In production it exposes the login cookie to any plaintext request to the same host. |
+
+### Checking it worked
+
+```bash
+curl -sI https://your-app.vercel.app/settings | head -1
+```
+
+- `302` to `/login` - correct, the login gate is on.
+- `503` - one of the three required variables above is missing.
+- `200` - **something is wrong**: the page is public. Check `SUPABASE_URL` and
+  `SUPABASE_ANON_KEY` really are set on the *production* environment.
 
 Then ship it:
 
@@ -78,6 +114,26 @@ image path already retries on 429 and 5xx.
 **Static files** are served by Flask through the function rather than the CDN.
 Fine at this size; move `static/` to a separate route if it ever matters.
 
+**The Run button costs the server nothing.** Generated code executes in the
+learner's browser via Pyodide (CPython compiled to WebAssembly) inside
+`static/js/pyworker.js`, never on the function. It downloads about 15 MB from
+`cdn.jsdelivr.net` on first use and caches it; if the CDN is unreachable, every
+page still loads and generates normally and only Run reports an error.
+
+Two things about that worker are deliberate and easy to break:
+
+- It is a **module worker** loading `pyodide.mjs` with a dynamic `import()`,
+  not the classic build with `importScripts`. Cross-origin `importScripts` is
+  blocked in some environments (it failed outright in the browser used for
+  testing while `fetch` and `import()` both worked), and the ESM build then
+  loads its own sub-assets the same way. Keep
+  `new Worker(url, { type: 'module' })` in `static/js/code_generation.js`.
+- **No SRI hash on Pyodide.** Every other CDN asset in `base.html` carries
+  `integrity` + `crossorigin`, but Subresource Integrity does not apply to a
+  worker's own imports, and Pyodide fetches `pyodide.asm.wasm`, the stdlib zip
+  and each package at runtime - those cannot be hashed ahead of time either.
+  The version is pinned in `PYODIDE_BASE` instead; bump it deliberately.
+
 ## Running locally
 
 ```bash
@@ -92,4 +148,6 @@ Run the checks:
 python -m utils.test_code_extraction
 python -m utils.test_code_smells
 python -m utils.test_prompt_enhance
+python -m utils.test_code_sections
+python -m utils.test_quiz
 ```

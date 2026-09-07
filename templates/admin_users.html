@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}Accounts - GyanGuru{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Accounts</h1>
+        <p>Sign-ups are closed. People get in only through a link you create here.</p>
+    </div>
+
+    {% if error == 'not_configured' %}
+        <div class="callout callout-warn">
+            <p><strong>Account management is not configured.</strong></p>
+            <p>Set <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code> and
+               <code>ADMIN_EMAILS</code>, then reload this page.</p>
+        </div>
+    {% elif error == 'unavailable' %}
+        <div class="callout callout-warn">
+            <p><strong>The account service did not answer.</strong></p>
+            <p>Nothing has changed. Reload in a moment; if it keeps failing, check the
+               Supabase project is awake and the secret key has not been revoked.</p>
+        </div>
+    {% endif %}
+
+    <div class="stack">
+        <!-- ---------------------------------------------------------------- Invite -->
+        <div class="card card--primary">
+            <div class="card-head"><h2>Invite someone</h2></div>
+            <p class="section-hint">
+                Creating a link always works. Sending the email depends on Supabase's built-in
+                mailer, which is rate limited and often silent - so you get the link either way
+                and can send it yourself.
+            </p>
+
+            <form id="inviteForm" novalidate>
+                <div class="form-group">
+                    <label for="inviteEmail">Their email address</label>
+                    <input type="email" id="inviteEmail" class="form-control input-large"
+                           autocomplete="off" inputmode="email" spellcheck="false"
+                           autocapitalize="none" required aria-describedby="inviteEmailError"
+                           placeholder="them@example.com">
+                    <p class="field-error" id="inviteEmailError" hidden></p>
+                </div>
+
+                <label class="form-hint" for="inviteHere">
+                    <input type="checkbox" id="inviteHere">
+                    Point the link at this host instead of the configured site
+                    <span class="muted">(use for local testing)</span>
+                </label>
+
+                <div class="card-actions mt-4">
+                    <button type="submit" class="btn btn-primary" id="inviteLinkBtn"
+                            data-action="link">Create invite link</button>
+                    <button type="button" class="btn btn-outline" id="inviteSendBtn"
+                            data-action="send">Create and email it</button>
+                </div>
+            </form>
+
+            <div class="auth-alert" id="inviteAlert" role="status" aria-live="polite" hidden></div>
+
+            <div id="inviteResult" hidden>
+                <label class="form-hint" for="inviteLink">Invite link</label>
+                <div class="copy-field">
+                    <input type="text" id="inviteLink" class="form-control" readonly
+                           aria-label="Invite link">
+                    <button type="button" class="btn btn-primary" id="copyLinkBtn">Copy</button>
+                </div>
+                <p class="form-hint" id="inviteNote"></p>
+            </div>
+        </div>
+
+        <!-- ----------------------------------------------------------------- People -->
+        <div class="card">
+            <div class="card-head">
+                <h2>People with access</h2>
+                <span class="results-meta">{{ users | length }} account{{ '' if users | length == 1 else 's' }}</span>
+            </div>
+
+            {% if not users %}
+                <p class="muted">
+                    {% if error %}No accounts could be loaded.{% else %}
+                    No accounts yet. Invite someone above.{% endif %}
+                </p>
+            {% else %}
+                <p class="section-hint">
+                    "Pending" means the invite link has not been opened yet. Deleting an account
+                    also deletes that person's saved lessons and quiz results.
+                </p>
+
+                <div id="userList">
+                {% for u in users %}
+                    <div class="user-row" data-row="{{ u.id }}">
+                        <div>
+                            <div class="user-email">
+                                {{ u.email }}
+                                {% if u.is_admin %}<span class="badge badge-admin">Admin</span>{% endif %}
+                                {% if u.pending %}<span class="badge badge-pending">Pending</span>{% endif %}
+                            </div>
+                            <div class="user-meta">
+                                Added {{ u.created_at or 'unknown' }}{% if u.last_sign_in_at %} &middot; last signed in {{ u.last_sign_in_at }}{% endif %}
+                            </div>
+                        </div>
+
+                        {% if account and u.email == account.email %}
+                            <span class="user-meta">This is you</span>
+                        {% else %}
+                            <button type="button" class="btn btn-outline btn-danger delete-user"
+                                    data-id="{{ u.id }}" data-email="{{ u.email }}">Delete</button>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                </div>
+
+                {% if page > 1 or has_next %}
+                    <div class="card-actions mt-4">
+                        {% if page > 1 %}
+                            <a class="btn btn-outline" href="{{ url_for('admin_users', page=page-1) }}">Previous</a>
+                        {% endif %}
+                        {% if has_next %}
+                            <a class="btn btn-outline" href="{{ url_for('admin_users', page=page+1) }}">Next</a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Deletion is irreversible and cascades, so it asks for the address in full. -->
+<div class="modal" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteTitle" hidden>
+    <div class="modal-content">
+        <button type="button" class="close" id="deleteClose" aria-label="Cancel">&times;</button>
+        <h2 id="deleteTitle">Delete this account?</h2>
+        <p>
+            <strong id="deleteEmail" class="user-email"></strong> loses access immediately.
+            Their saved lessons and quiz results are deleted with them.
+            <span class="danger-text">This cannot be undone.</span>
+        </p>
+
+        <div class="form-group">
+            <label for="deleteConfirm">Type the address to confirm</label>
+            <input type="text" id="deleteConfirm" class="form-control" autocomplete="off"
+                   spellcheck="false" autocapitalize="none" aria-describedby="deleteError">
+            <p class="field-error" id="deleteError" hidden></p>
+        </div>
+
+        <div class="card-actions">
+            <button type="button" class="btn btn-danger" id="deleteConfirmBtn" disabled>Delete account</button>
+            <button type="button" class="btn btn-outline" id="deleteCancel">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="application/json" id="app-config">{{ app_config | tojson }}</script>
+<script>
+// Configuration arrives as JSON, never as interpolated JavaScript.
+(function () {
+    var cfg = JSON.parse(document.getElementById('app-config').textContent);
+    var EMAIL = /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/;
+
+    function post(url, body) {
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': cfg.csrf },
+            body: JSON.stringify(body)
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+                if (!response.ok) throw new Error(data.error || 'That did not work. Please try again.');
+                return data;
+            });
+        });
+    }
+
+    // ------------------------------------------------------------------ invite
+    var form = document.getElementById('inviteForm');
+    var emailEl = document.getElementById('inviteEmail');
+    var linkBtn = document.getElementById('inviteLinkBtn');
+    var sendBtn = document.getElementById('inviteSendBtn');
+    var alertBox = document.getElementById('inviteAlert');
+    var result = document.getElementById('inviteResult');
+    var linkEl = document.getElementById('inviteLink');
+    var note = document.getElementById('inviteNote');
+
+    function say(message, kind) {
+        alertBox.textContent = message;
+        alertBox.className = 'auth-alert ' + (kind || 'error');
+        alertBox.hidden = !message;
+    }
+
+    function markEmail(message) {
+        var box = document.getElementById('inviteEmailError');
+        box.textContent = message || '';
+        box.hidden = !message;
+        emailEl.classList.toggle('invalid', !!message);
+        emailEl.setAttribute('aria-invalid', message ? 'true' : 'false');
+        return !message;
+    }
+
+    function checkEmail() {
+        var value = emailEl.value.trim();
+        if (!value) return markEmail('Enter the address to invite.');
+        if (!EMAIL.test(value)) return markEmail('That address is missing an @ or a domain.');
+        return markEmail('');
+    }
+
+    emailEl.addEventListener('blur', checkEmail);
+    emailEl.addEventListener('input', function () {
+        if (emailEl.classList.contains('invalid')) checkEmail();
+    });
+
+    function busy(on, which) {
+        linkBtn.disabled = on;
+        sendBtn.disabled = on;
+        if (which) which.textContent = on ? 'Working...' : which.dataset.label;
+    }
+    linkBtn.dataset.label = linkBtn.textContent;
+    sendBtn.dataset.label = sendBtn.textContent;
+
+    function invite(action, button) {
+        if (linkBtn.disabled) return;               // no double submit
+        if (!checkEmail()) { emailEl.focus(); return; }
+        say('');
+        busy(true, button);
+        post('/admin/invite', {
+            email: emailEl.value.trim(),
+            action: action,
+            site: document.getElementById('inviteHere').checked ? 'here' : ''
+        }).then(function (data) {
+            linkEl.value = data.link;
+            result.hidden = false;
+            var lines = [];
+            if (data.kind === 'recovery') {
+                lines.push('That address already had an account, so this is a password reset ' +
+                           'link instead. It works the same way.');
+            }
+            if (action === 'send') {
+                lines.push(data.email_sent
+                    ? 'The email was accepted for delivery. It can still be swallowed silently, ' +
+                      'so send the link yourself if nothing arrives.'
+                    : (data.email_error || 'The email did not send. Copy the link and send it yourself.'));
+            }
+            lines.push('It can be used once, and it expires. It points at ' + data.redirect_to + '.');
+            note.textContent = lines.join(' ');
+            say('Link ready for ' + data.email + '.', 'success');
+            linkEl.focus();
+            linkEl.select();
+        }).catch(function (error) {
+            result.hidden = true;
+            say(error.message, 'error');
+        }).then(function () { busy(false, button); });
+    }
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        invite('link', linkBtn);
+    });
+    sendBtn.addEventListener('click', function () { invite('send', sendBtn); });
+
+    document.getElementById('copyLinkBtn').addEventListener('click', function () {
+        var target = this;
+        linkEl.select();
+        var done = function () {
+            target.textContent = 'Copied';
+            setTimeout(function () { target.textContent = 'Copy'; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(linkEl.value).then(done, function () {
+                target.textContent = 'Press Ctrl+C';
+            });
+        } else {
+            // Older browsers, and any page not served over https.
+            try { document.execCommand('copy'); done(); }
+            catch (e) { target.textContent = 'Press Ctrl+C'; }
+        }
+    });
+
+    // ------------------------------------------------------------------ delete
+    var modal = document.getElementById('deleteModal');
+    var confirmEl = document.getElementById('deleteConfirm');
+    var confirmBtn = document.getElementById('deleteConfirmBtn');
+    var errorEl = document.getElementById('deleteError');
+    var emailLabel = document.getElementById('deleteEmail');
+    var pending = null;
+    var opener = null;
+
+    function openModal(id, email, button) {
+        pending = { id: id, email: email };
+        opener = button;
+        emailLabel.textContent = email;
+        confirmEl.value = '';
+        confirmBtn.disabled = true;
+        errorEl.hidden = true;
+        modal.hidden = false;
+        modal.classList.add('show');
+        confirmEl.focus();
+    }
+
+    function closeModal() {
+        modal.classList.remove('show');
+        modal.hidden = true;
+        pending = null;
+        if (opener) { opener.focus(); opener = null; }
+    }
+
+    document.querySelectorAll('.delete-user').forEach(function (button) {
+        button.addEventListener('click', function () {
+            openModal(button.dataset.id, button.dataset.email, button);
+        });
+    });
+
+    // The button only wakes up once the typed address matches exactly.
+    confirmEl.addEventListener('input', function () {
+        confirmBtn.disabled = !pending ||
+            confirmEl.value.trim().toLowerCase() !== pending.email.toLowerCase();
+    });
+
+    document.getElementById('deleteCancel').addEventListener('click', closeModal);
+    document.getElementById('deleteClose').addEventListener('click', closeModal);
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && !modal.hidden) closeModal();
+    });
+
+    confirmBtn.addEventListener('click', function () {
+        if (!pending || confirmBtn.disabled) return;
+        var target = pending;
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Deleting...';
+        errorEl.hidden = true;
+        post('/admin/users/delete', { user_id: target.id, confirm: confirmEl.value.trim() })
+            .then(function () {
+                var row = document.querySelector('[data-row="' + target.id + '"]');
+                if (row) row.remove();
+                closeModal();
+                say(target.email + ' was deleted.', 'success');
+                if (!document.querySelectorAll('.user-row').length) window.location.reload();
+            })
+            .catch(function (error) {
+                errorEl.textContent = error.message;
+                errorEl.hidden = false;
+                confirmEl.focus();
+            })
+            .then(function () {
+                confirmBtn.textContent = 'Delete account';
+                confirmBtn.disabled = confirmEl.value.trim().toLowerCase() !==
+                    (target.email || '').toLowerCase();
+            });
+    });
+})();
+</script>
+{% endblock %}

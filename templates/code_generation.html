@@ -1,164 +1,193 @@
 {% extends "base.html" %}
 
-{% block title %}Code Generation - ML Learning Assistant{% endblock %}
+{% block title %}Code - GyanGuru{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container container-wide">
     <div class="page-header">
-        <h1><i class="fas fa-code"></i> Code Generation</h1>
-        <p>Generate working Python code with detailed explanations for any ML concept</p>
+        <h1>Code</h1>
+        <p>A working Python program for any ML idea, explained a section at a time and run in your browser.</p>
     </div>
 
-    <div class="content-wrapper">
-        <!-- Input Section -->
-        <div class="input-section card">
-            <h2>What code would you like to generate?</h2>
-            
-            <form id="codeForm">
-                <div class="form-group">
-                    <label for="topic">
-                        <i class="fas fa-lightbulb"></i> Machine Learning Topic
-                    </label>
-                    <input 
-                        type="text" 
-                        id="topic" 
-                        name="topic" 
-                        class="form-control" 
-                        placeholder="e.g., linear regression, random forest, k-means clustering"
-                        required
-                    >
-                    <small class="form-hint">Enter the ML algorithm or concept you want code for</small>
-                </div>
+    <div class="card">
+        <form id="codeForm">
+            <div class="form-group">
+                <label for="topic">What should the program do?</label>
+                <input type="text" id="topic" name="topic" class="form-control input-large"
+                       placeholder="e.g. Q-learning, linear regression, k-means clustering" required>
+                <small class="form-hint">Name the algorithm or idea you want code for.</small>
+            </div>
 
-                <div class="form-group">
-                    <label for="length">
-                        <i class="fas fa-sliders-h"></i> Code Complexity
-                    </label>
-                    <select id="length" name="length" class="form-control">
-                        <option value="Brief">Brief - Simple example (20-30 lines)</option>
-                        <option value="Detailed" selected>Detailed - Full implementation (50-100 lines)</option>
-                        <option value="Comprehensive">Comprehensive - Production-ready (100+ lines)</option>
-                    </select>
-                </div>
+            <div class="chip-row mt-4 recent-topics" id="recentTopics" hidden></div>
 
-                <button type="submit" class="btn btn-primary btn-large">
-                    <i class="fas fa-rocket"></i> Generate Code
-                </button>
-            </form>
+            <div class="form-row mt-4">
+                <fieldset class="segmented">
+                    <legend>Explain for</legend>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Beginner" checked><span>Beginner</span></label>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Intermediate"><span>Intermediate</span></label>
+                    <label class="segmented-item"><input type="radio" name="levelChoice" data-mirror="level" value="Advanced"><span>Advanced</span></label>
+                </fieldset>
+                <fieldset class="segmented">
+                    <legend>Length</legend>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Brief"><span>Brief</span></label>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Detailed" checked><span>Detailed</span></label>
+                    <label class="segmented-item"><input type="radio" name="lengthChoice" data-mirror="length" value="Comprehensive"><span>Full</span></label>
+                </fieldset>
+                <fieldset class="segmented">
+                    <legend>Wording</legend>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Simple"><span>Simple</span></label>
+                    <label class="segmented-item"><input type="radio" name="wordingChoice" data-wording value="Standard" checked><span>Standard</span></label>
+                </fieldset>
+            </div>
+            <p class="form-hint">
+                "Explain for" sets how much theory you get. "Wording" sets how hard the
+                sentences are - pick Simple for short sentences and everyday words. It is
+                remembered on every page.
+            </p>
+            <input type="hidden" id="level" value="Beginner">
+            <input type="hidden" id="length" value="Detailed">
+
+            <button type="submit" class="btn btn-primary btn-large mt-4">Generate code</button>
+        </form>
+    </div>
+
+    <!-- Skeleton in the shape of the coming result. The page stays usable. -->
+    <div class="skeleton card mt-5" id="skeleton" hidden aria-hidden="true">
+        <div class="skeleton-head">
+            <span id="loadingMessage">Writing the program</span>
+            <span id="loadingElapsed"></span>
+        </div>
+        <div class="skeleton-bars">
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+            <div class="skeleton-bar"></div><div class="skeleton-bar"></div>
+        </div>
+    </div>
+
+    <div id="outputSection" class="mt-5" hidden>
+        <div class="results-head">
+            <h2 class="results-title" id="resultsTitle">Your program</h2>
+            <div class="card-actions">
+                <span class="results-meta" id="resultsMeta"></span>
+                <button id="downloadLessonBtn" class="btn btn-outline" type="button">Download lesson</button>
+            </div>
         </div>
 
-        <!-- Output Section -->
-        <div id="outputSection" class="output-section" style="display: none;">
-            <!-- Explanation -->
-            <div class="card">
-                <div class="output-header">
-                    <h2><i class="fas fa-code"></i> Python Code</h2>
-                    <div class="output-actions">
-                        <button id="copyCodeBtn" class="btn btn-secondary">
-                            <i class="fas fa-copy"></i> Copy Code
-                        </button>
-                        <button id="downloadCodeBtn" class="btn btn-secondary">
-                            <i class="fas fa-download"></i> Download
-                        </button>
+        <div class="chip-row continue-row" id="continueRow" data-current="code" hidden></div>
+
+        <!-- Results tabs. The follow-up card below is deliberately NOT a tab. -->
+        <div class="tabs mt-4" id="resultTabs">
+            <div class="tablist" role="tablist" aria-label="Results">
+                <button class="tab" role="tab" id="tab-program" data-tab="program"
+                        aria-controls="panel-program" aria-selected="true">Program</button>
+                <button class="tab" role="tab" id="tab-walkthrough" data-tab="walkthrough"
+                        aria-controls="panel-walkthrough" aria-selected="false" tabindex="-1">Walkthrough</button>
+                <button class="tab" role="tab" id="tab-practice" data-tab="practice"
+                        aria-controls="panel-practice" aria-selected="false" tabindex="-1">Practice</button>
+            </div>
+
+            <!-- Program -->
+            <div class="tabpanel" role="tabpanel" id="panel-program" aria-labelledby="tab-program" tabindex="0">
+                <div class="card card--primary">
+                    <div class="card-head">
+                        <h2>The program</h2>
+                        <div class="card-actions">
+                            <button id="runCodeBtn" class="btn btn-primary" type="button"
+                                    data-worker="{{ url_for('static', filename='js/pyworker.js') }}">Run</button>
+                            <button id="stopCodeBtn" class="btn btn-danger" type="button" style="display: none;">Stop</button>
+                            <button id="editCodeBtn" class="btn btn-outline" type="button">Edit</button>
+                            <button id="copyCodeBtn" class="btn btn-outline" type="button">Copy</button>
+                            <button id="downloadCodeBtn" class="btn btn-outline" type="button">Download .py</button>
+                        </div>
+                    </div>
+                    <p class="section-hint">Runs in your browser, nothing is sent to a server. Click a line number to ask about that line.</p>
+
+                        <div class="code-with-gutter" id="codeScroller">
+                            <div class="code-gutter" id="codeGutter"></div>
+                            <pre id="codePre"><code id="codeContent" class="language-python"></code></pre>
+                        </div>
+                    <textarea id="codeEditor" class="code-editor" spellcheck="false" style="display: none;"></textarea>
+
+                    <div id="runOutput" class="run-output" style="display: none;">
+                        <div class="run-status" id="runStatus" role="status" aria-live="polite"></div>
+                        <pre class="run-text" id="runText"></pre>
+                        <div class="run-figures" id="runFigures"></div>
                     </div>
                 </div>
-                
-                <div class="code-container">
-                    <pre><code id="codeContent" class="language-python"></code></pre>
-                </div>
-            </div>
 
-            <!-- Section-by-section breakdown -->
-            <div class="card" id="codeSectionsCard" style="display: none;">
-                <div class="output-header">
-                    <h2><i class="fas fa-layer-group"></i> Code, Section by Section</h2>
-                </div>
-                <p class="section-hint">Each block of the program above, with what it does.</p>
-                <div id="codeSections" class="code-sections"></div>
-            </div>
+                <details class="disclosure mt-5">
+                    <summary>Run it elsewhere</summary>
+                    <div class="disclosure-body">
+                        <div id="dependenciesSection" style="display: none;">
+                            <h3>Dependencies</h3>
+                            <div id="dependencies"></div>
+                        </div>
 
-            <!-- Code -->
-            <div class="card">
-                <div class="output-header">
-                    <h2><i class="fas fa-list-ol"></i> Code Walkthrough</h2>
-                </div>
-                <div id="explanation" class="explanation-content"></div>
-            </div>
-
-            <!-- Dependencies -->
-            <div id="dependenciesSection" class="card" style="display: none;">
-                <div class="output-header">
-                    <h2><i class="fas fa-box"></i> Required Dependencies</h2>
-                </div>
-                <div id="dependencies" class="dependencies-content"></div>
-            </div>
-
-            <!-- Execution Guide -->
-            <div class="card">
-                <div class="output-header">
-                    <h2><i class="fas fa-play-circle"></i> How to Run This Code</h2>
-                </div>
-                
-                <div class="execution-guide">
-                    <div class="execution-tabs">
-                        <button class="tab-btn active" data-tab="colab">
-                            <i class="fab fa-google"></i> Google Colab
-                        </button>
-                        <button class="tab-btn" data-tab="local">
-                            <i class="fas fa-laptop"></i> Local Environment
-                        </button>
-                        <button class="tab-btn" data-tab="jupyter">
-                            <i class="fas fa-book"></i> Jupyter Notebook
-                        </button>
-                    </div>
-
-                    <div id="colabTab" class="tab-content active">
-                        <h4>Google Colab (Recommended)</h4>
+                        <h3>Google Colab</h3>
                         <ol>
-                            <li>Click "Copy Code" above</li>
-                            <li>Open <a href="https://colab.research.google.com/" target="_blank">Google Colab</a></li>
-                            <li>Create a new notebook</li>
-                            <li>Paste the code into a cell</li>
-                            <li>Run with <kbd>Shift</kbd> + <kbd>Enter</kbd></li>
+                            <li>Copy the code above.</li>
+                            <li>Open <a href="https://colab.research.google.com/" target="_blank" rel="noopener">Google Colab</a> and create a notebook.</li>
+                            <li>Paste it into a cell and run with <kbd>Shift</kbd> + <kbd>Enter</kbd>.</li>
                         </ol>
-                        <a href="https://colab.research.google.com/" target="_blank" class="btn btn-primary">
-                            <i class="fas fa-external-link-alt"></i> Open Google Colab
-                        </a>
-                    </div>
 
-                    <div id="localTab" class="tab-content">
-                        <h4>Local Python Environment</h4>
+                        <h3>Local Python</h3>
                         <ol>
-                            <li>Save the code to a <code>.py</code> file</li>
-                            <li>Install dependencies (see above)</li>
-                            <li>Run: <code>python filename.py</code></li>
+                            <li>Save the code to a <code>.py</code> file.</li>
+                            <li>Install the dependencies listed above.</li>
+                            <li>Run <code>python filename.py</code>.</li>
+                        </ol>
+
+                        <h3>Jupyter</h3>
+                        <ol>
+                            <li>Start it with <code>jupyter notebook</code>.</li>
+                            <li>Paste the code into cells and run them in order.</li>
                         </ol>
                     </div>
+                </details>
+            </div>
 
-                    <div id="jupyterTab" class="tab-content">
-                        <h4>Jupyter Notebook</h4>
-                        <ol>
-                            <li>Start Jupyter: <code>jupyter notebook</code></li>
-                            <li>Create a new notebook</li>
-                            <li>Copy code into cells</li>
-                            <li>Run cells sequentially</li>
-                        </ol>
-                    </div>
+            <!-- Walkthrough: code beside the prose that explains it -->
+            <div class="tabpanel" role="tabpanel" id="panel-walkthrough" aria-labelledby="tab-walkthrough" tabindex="0" hidden>
+                <div class="card" id="codeSectionsCard" style="display: none;">
+                    <div class="card-head"><h2>Section by section</h2></div>
+                    <p class="section-hint">Each block of the program with what it does, set beside the code it explains.</p>
+                    <div id="codeSections" class="code-sections"></div>
+                </div>
+
+                <div class="card mt-5">
+                    <div class="card-head"><h2>In prose</h2></div>
+                    <div id="explanation" class="explanation-content"></div>
                 </div>
             </div>
-        
-            <!-- Ask a follow-up -->
-            <div class="card follow-up-card">
-                <div class="follow-up" id="followUp">
-                    <h3><i class="fas fa-comments"></i> Ask a follow-up</h3>
-                    <p class="follow-up-hint">Stuck on a step? Ask about anything above.</p>
-                    <div id="followUpThread" class="follow-up-thread"></div>
-                    <form id="followUpForm" class="follow-up-form" autocomplete="off">
-                        <input type="text" id="followUpInput" class="form-control" maxlength="500" required
-                               placeholder="e.g. What does line 12 do?   Why this loss function?   How do I change the learning rate?">
-                        <button type="submit" class="btn btn-primary">Ask</button>
-                    </form>
+
+            <!-- Practice -->
+            <div class="tabpanel" role="tabpanel" id="panel-practice" aria-labelledby="tab-practice" tabindex="0" hidden>
+                <div class="card" id="quizCard" data-context-ids="explanation codeContent" data-tab="tab-practice">
+                    <div class="card-head">
+                        <h2>Check your understanding</h2>
+                        <div class="card-actions">
+                            <button id="quizGenerateBtn" class="btn btn-primary" type="button">Generate quiz</button>
+                        </div>
+                    </div>
+                    <p class="section-hint">Key terms and a few questions on the program. Answers are checked as you go.</p>
+                    <div id="quizContent" role="status" aria-live="polite"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Ask a follow-up: pinned below the panel, visible from every tab. -->
+        <div class="card follow-up-card">
+            <div id="followUp">
+                <h2>Ask a follow-up</h2>
+                <p class="follow-up-hint">Stuck on a step? Ask about anything above. The answer arrives here, so nothing you were reading is hidden.</p>
+                <div id="followUpThread" class="follow-up-thread"></div>
+                <form id="followUpForm" class="follow-up-form" autocomplete="off">
+                    <label class="sr-only" for="followUpInput">Your question</label>
+                    <input type="text" id="followUpInput" class="form-control" maxlength="500" required
+                           placeholder="e.g. What does line 12 do? Why this learning rate?">
+                    <button type="submit" class="btn btn-primary">Ask</button>
+                </form>
             </div>
         </div>
     </div>

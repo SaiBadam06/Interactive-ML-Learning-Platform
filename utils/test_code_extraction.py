@@ -1,6 +1,6 @@
 """Checks for _extract_code, the parser that pulls the runnable program out of a
 model response. Every case here is a shape a NIM model actually returned."""
-from utils.genai_utils import _extract_code
+from utils.genai_utils import _extract_code, _strip_markdown
 
 PROG = "import numpy as np\n" + "\n".join("x%d = %d" % (i, i) for i in range(20)) + "\nprint(x1)"
 
@@ -42,6 +42,22 @@ def test_no_fence_returns_empty():
 
 def test_trivial_block_rejected():
     assert _extract_code("```python\nx=1\n```")[0] == ""
+
+
+def test_strip_markdown_unwraps_bold():
+    # The exact leak seen from the Beginner prompt.
+    assert _strip_markdown("- **Algorithm**: a procedure.") == "- Algorithm: a procedure."
+
+
+def test_strip_markdown_leaves_python_exponent_alone():
+    # Both spellings appear in quoted walkthrough lines; neither is bold.
+    for text in ("the line 'result = 2 ** 3' cubes two", "it computes x**2 and y**3 per row"):
+        assert _strip_markdown(text) == text, text
+
+
+def test_strip_markdown_removes_headings_but_not_comments():
+    text = "### Key Terms\nx = 1  # a comment\n# a comment line"
+    assert _strip_markdown(text) == "Key Terms\nx = 1  # a comment\n# a comment line"
 
 
 if __name__ == "__main__":
