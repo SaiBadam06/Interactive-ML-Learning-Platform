@@ -11,27 +11,34 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// Show/hide loading overlay. These requests take 15-90 s, which feels broken
-// without a message saying what is happening and a counter proving it still is.
+// These requests take 15-90 s, which feels broken without a message saying what
+// is happening and a counter proving it still is. A skeleton in the shape of the
+// coming result says it in place, and leaves the rest of the page usable - the
+// full-screen overlay it replaces did neither.
 let loadingTimer = null;
 
 function showLoading(show = true, message = '') {
-    const overlay = document.getElementById('loadingOverlay');
-    const elapsed = document.getElementById('loadingElapsed');
+    const skeleton = document.getElementById('skeleton');
     clearInterval(loadingTimer);
     loadingTimer = null;
+    if (!skeleton) return;
 
     if (!show) {
-        overlay.classList.remove('show');
+        skeleton.hidden = true;
         return;
     }
-    if (message) document.getElementById('loadingMessage').textContent = message;
+    const label = document.getElementById('loadingMessage');
+    const elapsed = document.getElementById('loadingElapsed');
+    if (message && label) label.textContent = message;
     const started = Date.now();
-    elapsed.textContent = '0 s';
-    loadingTimer = setInterval(() => {
-        elapsed.textContent = Math.round((Date.now() - started) / 1000) + ' s';
-    }, 1000);
-    overlay.classList.add('show');
+    if (elapsed) {
+        elapsed.textContent = '0 s';
+        loadingTimer = setInterval(() => {
+            elapsed.textContent = Math.round((Date.now() - started) / 1000) + ' s';
+        }, 1000);
+    }
+    skeleton.hidden = false;
+    skeleton.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // Copy text to clipboard
@@ -203,6 +210,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     renderRecentTopics();
     renderContinueRow();
+
+    // Segmented controls are radio groups (so arrow keys work for free) that
+    // mirror into the hidden #level / #length inputs every page's JS reads.
+    document.querySelectorAll('.segmented input[data-mirror]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const mirror = document.getElementById(radio.dataset.mirror);
+            if (mirror) mirror.value = radio.value;
+        });
+    });
 
     // Home hero: one topic box, four destinations.
     const quickTopic = document.getElementById('quickTopic');
@@ -429,6 +445,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Failed to generate the quiz');
             renderQuiz(target, data, generate);
+            // Quiz content lives in a panel, so this is the one action that does
+            // switch tabs - otherwise the questions would land out of sight.
+            if (card.dataset.tab) selectTab(card.dataset.tab);
             target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } catch (err) {
             showToast(err.message || 'An error occurred', 'error');
@@ -448,22 +467,157 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-// Load saved API keys on page load
+// ===== Nav drawer =====
+// Below 768 px the menu is a drawer over the page, so it has to behave like one:
+// trap the focus inside it, close on Escape, and give the focus back.
 document.addEventListener('DOMContentLoaded', () => {
-    // Mobile navigation toggle
     const navToggle = document.getElementById('navToggle');
     const navMenu = document.getElementById('navMenu');
-    
-    if (navToggle) {
-        navToggle.addEventListener('click', () => {
-            const open = navMenu.classList.toggle('active');
-            navToggle.setAttribute('aria-expanded', String(open));
+    if (!navToggle || !navMenu) return;
+
+    let backdrop = null;
+
+    const focusables = () => Array.from(
+        navMenu.querySelectorAll('a[href], button:not([disabled]), input, select, textarea'));
+
+    const setOpen = (open) => {
+        navMenu.classList.toggle('active', open);
+        navToggle.setAttribute('aria-expanded', String(open));
+        navToggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
+        if (open) {
+            backdrop = document.createElement('div');
+            backdrop.className = 'nav-backdrop';
+            backdrop.addEventListener('click', () => setOpen(false));
+            document.body.appendChild(backdrop);
+            const first = focusables()[0];
+            if (first) first.focus();
+        } else {
+            if (backdrop) { backdrop.remove(); backdrop = null; }
+            navToggle.focus();
+        }
+    };
+
+    navToggle.addEventListener('click', () => setOpen(!navMenu.classList.contains('active')));
+
+    document.addEventListener('keydown', (e) => {
+        if (!navMenu.classList.contains('active')) return;
+        if (e.key === 'Escape') { setOpen(false); return; }
+        if (e.key !== 'Tab') return;
+        const items = focusables();
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+});
+
+
+// ===== Theme: light | dark | system =====
+// Applied to <html> before first paint by an inline script in base.html; this
+// only handles the toggle and remembers the choice.
+document.addEventListener('DOMContentLoaded', () => {
+    const button = document.getElementById('themeToggle');
+    if (!button) return;
+    const ORDER = ['system', 'light', 'dark'];
+
+    const read = () => {
+        try {
+            const stored = localStorage.getItem('theme');
+            return ORDER.includes(stored) ? stored : 'system';
+        } catch (err) {
+            return 'system';
+        }
+    };
+
+    const apply = (theme) => {
+        if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+        else document.documentElement.setAttribute('data-theme', theme);
+        button.title = 'Theme: ' + theme;
+        button.setAttribute('aria-label', 'Switch theme (currently ' + theme + ')');
+    };
+
+    apply(read());
+    button.addEventListener('click', () => {
+        const next = ORDER[(ORDER.indexOf(read()) + 1) % ORDER.length];
+        try { localStorage.setItem('theme', next); } catch (err) { /* private mode */ }
+        apply(next);
+        showToast('Theme: ' + next, 'info');
+    });
+});
+
+
+// ===== Tabs =====
+// Real tabs, not styled divs. Inactive panels keep their DOM - only the `hidden`
+// attribute goes on - so a run started in one panel keeps streaming while
+// another is open, and assistive tech and Ctrl+F both skip what is not shown.
+function initTabs(root) {
+    const list = root.querySelector('[role="tablist"]');
+    if (!list) return;
+    const tabs = Array.from(list.querySelectorAll('[role="tab"]'));
+    if (tabs.length < 2) { list.hidden = true; return; }
+
+    const select = (tab, { focus = true, hash = true } = {}) => {
+        tabs.forEach(t => {
+            const on = t === tab;
+            t.setAttribute('aria-selected', String(on));
+            t.tabIndex = on ? 0 : -1;
+            const panel = document.getElementById(t.getAttribute('aria-controls'));
+            if (panel) panel.hidden = !on;
         });
-    }
-    
-    // API keys are now configured in .env file on the server
-    // No need to load from localStorage
-    
+        clearTabDot(tab.id);
+        if (focus) tab.focus();
+        if (hash) {
+            const name = tab.dataset.tab;
+            try { history.replaceState(null, '', '#' + name); } catch (err) { /* file:// */ }
+        }
+    };
+    root._selectTab = select;
+
+    tabs.forEach(tab => tab.addEventListener('click', () => select(tab)));
+
+    list.addEventListener('keydown', (e) => {
+        const i = tabs.indexOf(document.activeElement);
+        if (i < 0) return;
+        const keys = { ArrowLeft: i - 1, ArrowRight: i + 1, Home: 0, End: tabs.length - 1 };
+        if (!(e.key in keys)) return;
+        e.preventDefault();
+        select(tabs[(keys[e.key] + tabs.length) % tabs.length]);
+    });
+
+    // Deep link and restore. An unknown hash falls back to the first tab.
+    const wanted = decodeURIComponent(window.location.hash.slice(1));
+    const target = tabs.find(t => t.dataset.tab === wanted) || tabs[0];
+    select(target, { focus: false, hash: false });
+}
+
+// "Something arrived on a tab you are not looking at." Without this the learner
+// never finds out the sections or the quiz appeared.
+function markTabNew(tabId) {
+    const tab = document.getElementById(tabId);
+    if (!tab || tab.getAttribute('aria-selected') === 'true' || tab.querySelector('.tab-dot')) return;
+    const dot = document.createElement('span');
+    dot.className = 'tab-dot';
+    const word = document.createElement('span');
+    word.className = 'sr-only tab-dot-word';
+    word.textContent = ' (new)';
+    tab.append(dot, word);
+}
+
+function clearTabDot(tabId) {
+    const tab = document.getElementById(tabId);
+    if (!tab) return;
+    tab.querySelectorAll('.tab-dot, .tab-dot-word').forEach(el => el.remove());
+}
+
+function selectTab(tabId) {
+    const tab = document.getElementById(tabId);
+    const root = tab && tab.closest('.tabs');
+    if (root && root._selectTab) root._selectTab(tab, { focus: false });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.tabs').forEach(initTabs);
 });
 
 
@@ -544,5 +698,7 @@ window.downloadTextFile = downloadTextFile;
 window.formatMarkdown = formatMarkdown;
 window.renderQuiz = renderQuiz;
 window.rememberTopic = rememberTopic;
+window.selectTab = selectTab;
+window.markTabNew = markTabNew;
 // The lesson download (below) needs whatever quiz is currently on screen.
 window.getLastQuiz = () => lastQuiz;
