@@ -39,7 +39,29 @@
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
-            <a class="nav-brand" href="{{ url_for('index') }}">GyanGuru</a>
+            <a class="nav-brand" href="{{ url_for('index') }}">
+                {# The mark is the product: a code gutter with one line picked out,
+                   which is the thing this app actually does - you point at a line
+                   and ask about it. Drawn with currentColor so it inherits the
+                   theme instead of needing a second copy for dark mode. #}
+                <svg class="nav-logo" viewBox="0 0 32 32" role="img" aria-label="" focusable="false">
+                    <rect x="1" y="1" width="30" height="30" rx="7"
+                          fill="none" stroke="currentColor" stroke-width="2"/>
+                    <!-- the gutter -->
+                    <line x1="10" y1="7" x2="10" y2="25"
+                          stroke="currentColor" stroke-width="1.5" opacity=".45"/>
+                    <!-- three lines of code, the middle one marked -->
+                    <line x1="14" y1="11" x2="25" y2="11"
+                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    <line x1="14" y1="16" x2="22" y2="16"
+                          stroke="var(--marker)" stroke-width="2.5" stroke-linecap="round"/>
+                    <line x1="14" y1="21" x2="24" y2="21"
+                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    <!-- the marker sitting in the gutter beside that line -->
+                    <circle cx="6.5" cy="16" r="2" fill="var(--marker)"/>
+                </svg>
+                <span>GyanGuru</span>
+            </a>
 
             <div class="nav-actions">
                 <button class="nav-toggle" id="navToggle" type="button"

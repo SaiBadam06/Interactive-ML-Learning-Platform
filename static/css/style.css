@@ -181,12 +181,25 @@ kbd {
 }
 
 .nav-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
     font-weight: 600;
     font-size: 1.05rem;
     color: var(--ink);
     text-decoration: none;
     margin-right: auto;
 }
+
+/* Sized in em so the mark tracks the wordmark rather than needing its own
+   breakpoint. The accent lives in the marked line, so the frame can inherit. */
+.nav-logo {
+    width: 1.65em;
+    height: 1.65em;
+    flex: none;
+    color: var(--accent);
+}
+.nav-brand:hover .nav-logo { color: var(--ink); }
 
 .nav-menu {
     display: flex;
@@ -335,8 +348,16 @@ textarea.form-control { min-height: 96px; }
 
 .form-hint { display: block; margin-top: var(--s2); color: var(--ink-muted); font-size: 14px; }
 
-/* auto-fit so a row takes a third control without a hand-written breakpoint */
-.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s4); }
+/* A row of controls, not a column layout. Equal-width grid tracks stretched
+   each segmented box to a full third of the row while its options kept their
+   natural width, leaving dead space inside the border. Flex lets every control
+   be exactly as wide as its own options and wrap when they stop fitting. */
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--s5) var(--s6);
+}
 
 .input-large { min-height: 48px; font-size: 17px; }
 
