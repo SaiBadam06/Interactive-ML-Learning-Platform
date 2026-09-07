@@ -62,3 +62,6 @@ htmlcov/
 # Temporary files
 *.tmp
 *.bak
+
+# Claude Code worktrees and session state
+.claude/
