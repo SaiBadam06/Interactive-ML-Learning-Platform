@@ -1,5 +1,6 @@
 from gtts import gTTS
 import os
+import secrets
 import re
 import logging
 from datetime import datetime
@@ -80,7 +81,11 @@ def text_to_audio(text, topic="ml_topic"):
         # Generate unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_topic = "".join(c if c.isalnum() else "_" for c in topic)[:30]
-        filename = f"{safe_topic}_{timestamp}.mp3"
+        # A random component, because the app is now multi-user and these files
+        # sit in one shared directory: topic plus timestamp is guessable, which
+        # would let one learner fetch another's generated file. The name is the
+        # only thing protecting it, so it has to be unguessable.
+        filename = f"{safe_topic}_{timestamp}_{secrets.token_urlsafe(9)}.mp3"
         filepath = os.path.join(os.getenv('DATA_DIR', '.'), 'generated_audio', filename)
 
         # Generate audio with cleaned text

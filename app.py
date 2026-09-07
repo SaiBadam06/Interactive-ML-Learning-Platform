@@ -38,7 +38,8 @@ app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(16))
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=bool(os.getenv('VERCEL')),
+    # On by default: set INSECURE_COOKIES=1 only for local http development.
+    SESSION_COOKIE_SECURE=os.getenv('INSECURE_COOKIES', '') != '1',
     PERMANENT_SESSION_LIFETIME=timedelta(hours=auth.SESSION_HOURS),
 )
 if not auth.auth_enabled():
@@ -122,7 +123,17 @@ PUBLIC_ENDPOINTS = {'static', 'login', 'auth_callback', 'auth_session', 'logout'
 def require_login():
     if request.endpoint in PUBLIC_ENDPOINTS or request.endpoint is None:
         return None
-    return auth.guard()
+    blocked = auth.guard()
+    if blocked is not None:
+        return blocked
+    # The generation endpoints spend the deployment's API key and the signed-in
+    # learner's quota, so they are state-changing. Enforced here rather than per
+    # route for the same reason login is: a route added later cannot forget.
+    # SameSite=Lax and the JSON content type already make a cross-site post hard;
+    # this stops it depending on two side effects.
+    if request.method == 'POST' and request.path.startswith('/api/') and not auth.csrf_ok():
+        return jsonify({'error': 'Invalid request. Please reload the page.'}), 400
+    return None
 
 
 @app.after_request

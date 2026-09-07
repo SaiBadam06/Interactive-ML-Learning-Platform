@@ -58,6 +58,17 @@ def on_vercel():
     return bool(_env('VERCEL'))
 
 
+def auth_optional():
+    """Explicit opt-out for local development and the test suite.
+
+    Running without login used to be the automatic consequence of Supabase
+    being unset, which meant a typo in one variable silently published the
+    whole app - including the admin console. It now has to be asked for, and
+    can never be asked for on a deployment.
+    """
+    return bool(_env('AUTH_OPTIONAL')) and not on_vercel()
+
+
 def stub_active():
     """The e2e stub. Refuses to activate on Vercel - it would be a login bypass."""
     return bool(_env('AUTH_TEST_STUB')) and not on_vercel()
@@ -71,12 +82,13 @@ def missing_config():
 def auth_enabled():
     """Whether login is enforced. Off locally when Supabase is not configured, so
     development and the existing test suite keep working without an account."""
-    return stub_active() or bool(supabase_url() and anon_key())
+    return stub_active() or bool(supabase_url() and anon_key()) or not auth_optional()
 
 
 def auth_misconfigured_on_vercel():
-    """Fail closed: deployed but not configured means nobody gets in."""
-    return on_vercel() and bool(missing_config())
+    """Fail closed: configured for login but missing a variable means nobody
+    gets in, on any host. Only an explicit AUTH_OPTIONAL off Vercel opts out."""
+    return bool(missing_config()) and not auth_optional()
 
 
 def invites_enabled():
@@ -297,7 +309,9 @@ def admin_required(view):
         if blocked is not None:
             return blocked
         user = current_user()
-        if user and not is_admin(user.get('email')):
+        # `user and ...` let an anonymous caller through whenever login was
+        # disabled: no session means no user, so the check simply did not run.
+        if not user or not is_admin(user.get('email')):
             abort(404)  # identical to a page that does not exist
         return view(*args, **kwargs)
     return wrapper

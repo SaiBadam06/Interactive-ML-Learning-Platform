@@ -773,6 +773,13 @@ window.fetch = function (input, init) {
                 body.wording = wordingPref();
                 init = Object.assign({}, init, { body: JSON.stringify(body) });
             }
+            // Same reason the server checks it centrally: no page has to remember.
+            const token = document.querySelector('meta[name="csrf-token"]');
+            if (token) {
+                init = Object.assign({}, init, {
+                    headers: Object.assign({}, init.headers, { 'X-CSRF-Token': token.content })
+                });
+            }
         } catch (e) { /* not a JSON body - send it untouched */ }
     }
     return _nativeFetch(input, init);
