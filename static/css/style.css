@@ -70,7 +70,17 @@ body {
     line-height: 1.6;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
+
+    /* Sticky footer. A short page - the login form, an error page - used to
+       leave the footer floating in the middle with dead space beneath it,
+       which read as a much taller footer than on a full page. */
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
+
+/* dvh accounts for the mobile URL bar; ignored where unsupported. */
+@supports (min-height: 100dvh) { body { min-height: 100dvh; } }
 
 img, svg, video { max-width: 100%; height: auto; }
 
@@ -129,7 +139,7 @@ kbd {
 
 .container-wide { max-width: 1180px; }
 
-.main-content { padding: var(--s6) 0 var(--s8); min-height: 60vh; }
+.main-content { padding: var(--s6) 0 var(--s8); flex: 1 0 auto; }
 
 .page-header { margin-bottom: var(--s6); }
 .page-header p { color: var(--ink-muted); max-width: var(--measure); margin: 0; }
@@ -231,6 +241,7 @@ kbd {
 /* --- Footer --- */
 
 .footer {
+    flex-shrink: 0;
     border-top: 1px solid var(--hairline);
     padding: var(--s5) 0;
     color: var(--ink-muted);
@@ -340,12 +351,20 @@ textarea.form-control { min-height: 96px; }
     gap: 2px;
     background: var(--surface-2);
 }
+/* The legend was floated to sit above the group, but float is ignored on a
+   flex item, so it became the first item inside the pill box and long labels
+   like "Explain for" wrapped mid-phrase. Taking it out of flow puts it back
+   above the box and lets the options keep the full width. */
+.segmented { position: relative; margin-top: 26px; }
 .segmented legend {
-    float: left;
-    width: 100%;
-    padding: 0 0 var(--s2);
+    position: absolute;
+    top: -24px;
+    left: 0;
+    padding: 0;
+    margin: 0;
     font-weight: 500;
     font-size: 15px;
+    white-space: nowrap;
 }
 .segmented-item { position: relative; display: block; }
 .segmented-item input {
@@ -1093,6 +1112,49 @@ textarea.form-control { min-height: 96px; }
     margin: 0 0 var(--s2);
 }
 .error-code-bad { color: var(--danger); }
+
+/* The navbar is sticky, so anything scrolled to - by scrollIntoView after a
+   generation, or by an #anchor like /settings#about - lands underneath it.
+   Reserve its height plus a little breathing room on every scroll target. */
+:root { scroll-padding-top: 76px; }
+
+#outputSection,
+#skeleton,
+.results-head,
+.tabpanel,
+.card-head,
+[id] > h2 {
+    scroll-margin-top: 76px;
+}
+
+/* --- Theme switch ------------------------------------------------------- */
+
+.theme-dock {
+    position: sticky;
+    top: 69px;                 /* clears the 57px bar */
+    z-index: 40;
+    display: flex;
+    justify-content: flex-end;
+    /* body is a flex column, where `margin: 0 auto` would shrink this to its
+       content and centre it - which put the switch in the middle of the page.
+       An explicit width makes it span, so flex-end is a real right edge. */
+    width: 100%;
+    max-width: 1180px;          /* matches .container-wide, the widest page */
+    margin: 0 auto;
+    padding: 0 var(--s5);
+    height: 0;                 /* takes no vertical space in the flow */
+    pointer-events: none;      /* only the button is clickable */
+}
+.theme-dock .btn-icon {
+    pointer-events: auto;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 1px 2px rgb(0 0 0 / .06);
+}
+
+@media (max-width: 700px) {
+    .theme-dock { top: 65px; padding: 0 var(--s4); }
+}
 
 /* ---------- 7. Utilities ------------------------------------------------- */
 

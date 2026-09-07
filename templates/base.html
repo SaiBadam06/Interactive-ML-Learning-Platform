@@ -42,10 +42,6 @@
             <a class="nav-brand" href="{{ url_for('index') }}">GyanGuru</a>
 
             <div class="nav-actions">
-                <button class="btn-icon" id="themeToggle" type="button"
-                        aria-label="Switch theme" title="Switch theme">
-                    <i class="fas fa-circle-half-stroke" aria-hidden="true"></i>
-                </button>
                 <button class="nav-toggle" id="navToggle" type="button"
                         aria-label="Open navigation menu" aria-expanded="false" aria-controls="navMenu">
                     <i class="fas fa-bars" aria-hidden="true"></i>
@@ -84,6 +80,15 @@
             </ul>
         </div>
     </nav>
+
+    <!-- Theme switch: below the bar, top right. The strip itself ignores the
+         pointer so it never blocks what is underneath it. -->
+    <div class="theme-dock">
+        <button class="btn-icon" id="themeToggle" type="button"
+                aria-label="Switch theme" title="Switch theme">
+            <i class="fas fa-circle-half-stroke" aria-hidden="true"></i>
+        </button>
+    </div>
 
     <!-- Main Content -->
     <main class="main-content" id="main">

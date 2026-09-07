@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Sign in - ML Learning Assistant{% endblock %}
+{% block title %}Sign in - GyanGuru{% endblock %}
 
 {% block content %}
 <div class="container auth-page">
@@ -140,15 +140,25 @@
             'your network may be blocking cdn.jsdelivr.net.', 'error');
         button.disabled = true;
     } else {
-        // The Flask cookie lasts 12 hours; the Supabase session in this browser
-        // outlives it. If one is still valid, swap it for a new cookie silently
-        // rather than asking for the password again.
-        client.auth.getSession().then(function (result) {
-            var session = result && result.data && result.data.session;
-            if (session && session.access_token) {
-                exchange(session.access_token).catch(function () { /* fall through to the form */ });
-            }
-        });
+        // Arriving here from Sign out: end the Supabase session as well, or the
+        // silent resume below would immediately sign the person back in.
+        if (new URLSearchParams(window.location.search).has('signed_out')) {
+            client.auth.signOut().then(function () {
+                say('You are signed out.', 'success');
+            }, function () {
+                say('You are signed out on this device.', 'success');
+            });
+        } else {
+            // The Flask cookie lasts 12 hours; the Supabase session in this browser
+            // outlives it. If one is still valid, swap it for a new cookie silently
+            // rather than asking for the password again.
+            client.auth.getSession().then(function (result) {
+                var session = result && result.data && result.data.session;
+                if (session && session.access_token) {
+                    exchange(session.access_token).catch(function () { /* fall through to the form */ });
+                }
+            });
+        }
     }
 
     form.addEventListener('submit', function (event) {

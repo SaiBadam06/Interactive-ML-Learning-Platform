@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
             modelDetails.textContent = JSON.stringify(data, null, 2);
             modelModal.classList.add('show');
         } catch (error) {
-            showToast('Failed to load model information', 'error');
+            showToast('Could not load the model details. Reload to try again.', 'error');
         }
     });
 

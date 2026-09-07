@@ -45,7 +45,7 @@ function showLoading(show = true, message = '') {
 async function copyToClipboard(text) {
     try {
         await navigator.clipboard.writeText(text);
-        showToast('Copied to clipboard!', 'success');
+        showToast('Copied.', 'success');
     } catch (err) {
         // Fallback for older browsers
         const textArea = document.createElement('textarea');
@@ -54,7 +54,7 @@ async function copyToClipboard(text) {
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        showToast('Copied to clipboard!', 'success');
+        showToast('Copied.', 'success');
     }
 }
 
@@ -69,7 +69,7 @@ function downloadTextFile(content, filename) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('File downloaded!', 'success');
+    showToast('Saved to your downloads.', 'success');
 }
 
 // Format plain text to HTML. The model is told to emit Title Case headings on
@@ -465,7 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const topicEl = document.getElementById('topic');
         const topic = topicEl ? topicEl.value.trim() : '';
         if (!topic) {
-            showToast('Please enter a topic', 'error');
+            showToast('Name a topic first.', 'error');
             return;
         }
         const levelEl = document.getElementById('level');
@@ -492,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (card.dataset.tab) selectTab(card.dataset.tab);
             target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } catch (err) {
-            showToast(err.message || 'An error occurred', 'error');
+            showToast(err.message || 'That did not work. Try again in a moment.', 'error');
         } finally {
             button.disabled = false;
             button.innerHTML = label;
@@ -723,7 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
             history.push({ role: 'assistant', content: data.answer });
         } catch (err) {
             pending.remove();
-            showToast(err.message || 'An error occurred', 'error');
+            showToast(err.message || 'That did not work. Try again in a moment.', 'error');
         } finally {
             button.disabled = false;
             input.focus();

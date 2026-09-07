@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const level = document.getElementById('level').value;
 
         if (!topic) {
-            showToast('Please enter a topic', 'error');
+            showToast('Name a topic first.', 'error');
             return;
         }
         
@@ -83,14 +83,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 outputSection.hidden = false;
                 outputSection.scrollIntoView({ behavior: 'smooth' });
                 rememberTopic(topic);
-                showToast('Images generated successfully!', 'success');
+                showToast('Your diagrams are ready.', 'success');
             } else {
                 throw new Error('Failed to generate content');
             }
             
         } catch (error) {
             console.error('Error:', error);
-            showToast(error.message || 'An error occurred', 'error');
+            showToast(error.message || 'That did not work. Try again in a moment.', 'error');
         } finally {
             showLoading(false);
         }

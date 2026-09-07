@@ -227,8 +227,12 @@ def logout():
     # The nav signs out with an ordinary form, so answer one with a redirect
     # rather than a page full of JSON. Callers that asked for JSON still get it.
     if request.headers.get('X-CSRF-Token'):
-        return jsonify({'ok': True, 'next': '/login'})
-    return redirect(url_for('login'))
+        return jsonify({'ok': True, 'next': '/login?signed_out=1'})
+    # signed_out tells the login page to end the Supabase session too. Without
+    # it, clearing the Flask cookie achieves nothing: the browser still holds a
+    # valid Supabase session and the page silently trades it for a new cookie,
+    # so "Sign out" put you straight back in.
+    return redirect(url_for('login', signed_out=1))
 
 
 def spend_quota(kind):
@@ -471,8 +475,16 @@ def practice():
 
 @app.route('/settings')
 def settings():
-    """Settings page"""
-    return render_template('settings.html')
+    """Settings page. Usage is only meaningful when there is an account to
+    count against, so it is fetched only then and never blocks the page."""
+    user = auth.current_user()
+    used = limit = None
+    if user and auth.auth_enabled():
+        try:
+            used, limit = quota.used_today(user['id']), quota.daily_limit()
+        except Exception:                      # usage is informational, not load-bearing
+            logger.warning("Could not read today's usage", exc_info=True)
+    return render_template('settings.html', usage_today=used, usage_limit=limit)
 
 @app.route('/about')
 def about():

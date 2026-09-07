@@ -10,27 +10,34 @@
     </div>
 
     <div class="settings-stack">
-        {# 1. Your account - only when login is configured and someone is signed in. #}
-        {% if current_user is defined and current_user %}
+        {# 1. Your account. The context processor supplies `account` and
+           `account_is_admin`; the names used here before did not exist, so this
+           card never rendered and Access always claimed login was off. #}
+        {% if account %}
         <div class="card">
             <h2>Your account</h2>
             <dl class="kv">
-                <dt>Signed in as</dt><dd>{{ current_user.email }}</dd>
-                {% if usage_today is defined %}
+                <dt>Signed in as</dt><dd>{{ account.email }}</dd>
+                {% if usage_today is not none %}
                 <dt>Generations today</dt><dd>{{ usage_today }} of {{ usage_limit }}</dd>
                 {% endif %}
             </dl>
-            <p class="mt-4"><a href="{{ url_for('logout') }}">Sign out</a></p>
+            {# Signing out changes state, so it is a form post, not a link. #}
+            <form method="post" action="{{ url_for('logout') }}" class="mt-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-outline">Sign out</button>
+            </form>
         </div>
         {% endif %}
 
         {# 2. Access #}
         <div class="card">
             <h2>Access</h2>
-            {% if current_user is defined %}
-                <p>Login is configured, so lessons and usage counts are tied to your account.</p>
-                {% if is_admin is defined and is_admin %}
-                <p><a href="/admin/users">Invite and manage users</a></p>
+            {% if auth_on %}
+                <p>Accounts are on, so saved lessons and usage counts belong to whoever is
+                   signed in. New people get in by invitation only.</p>
+                {% if account_is_admin %}
+                <p><a href="{{ url_for('admin_users') }}">Invite someone or manage accounts</a></p>
                 {% endif %}
             {% else %}
                 <p>Login is not configured on this deployment. Everything runs anonymously and
