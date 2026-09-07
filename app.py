@@ -458,8 +458,10 @@ def _remaining_admins(target):
 # Routes
 @app.route('/')
 def index():
-    """Home page"""
-    return render_template('index.html')
+    """The chat is the way in now. The old home page was a topic box and four
+    buttons choosing which page to land on; the composer asks the same question
+    and answers it in place."""
+    return redirect(url_for('chat_page'))
 
 @app.route('/text-explanation')
 def text_explanation():

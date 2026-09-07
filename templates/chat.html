@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - GyanGuru{% endblock %}
+
+{% block content %}
+{# One conversation replaces the four generator forms. The rail, the thread and
+   the composer are the whole page; everything else a lesson produces - a
+   program, a recording, a diagram - arrives inside a turn. #}
+<div class="container chat-page">
+    <div class="chat-shell">
+
+        <!-- Rail: new lesson, what you have studied, a way back to Settings. -->
+        <aside class="chat-rail" id="chatRail" aria-label="Lessons">
+            <button type="button" class="btn btn-outline chat-rail-new" id="newLessonBtn">
+                <i class="fas fa-plus" aria-hidden="true"></i> New lesson
+            </button>
+
+            <h2 class="chat-rail-heading">Recent topics</h2>
+            <div class="chat-rail-list" id="railTopics">
+                <p class="chat-rail-empty">Nothing yet. Ask about anything below.</p>
+            </div>
+
+            <a class="chat-rail-foot" href="{{ url_for('settings') }}">
+                <i class="fas fa-sliders" aria-hidden="true"></i> Settings
+            </a>
+        </aside>
+
+        <div class="chat-col">
+            <!-- Only shown below 900px, where the rail is an overlay. -->
+            <div class="chat-topbar">
+                <button type="button" class="btn btn-outline" id="railToggle"
+                        aria-expanded="false" aria-controls="chatRail">
+                    <i class="fas fa-bars" aria-hidden="true"></i> Lessons
+                </button>
+            </div>
+
+            <div class="chat-thread" id="chatThread" role="log" aria-live="polite"
+                 aria-label="Conversation" tabindex="0">
+                <div class="chat-empty" id="chatEmpty">
+                    <h1 class="chat-empty-title">What shall we learn?</h1>
+                    <p class="chat-empty-sub">Name a machine learning idea. Ask again in simpler
+                       words whenever an answer goes over your head.</p>
+                    <div class="chat-suggestions" id="chatSuggestions">
+                        <button type="button" class="topic-chip chat-chip">Q-learning</button>
+                        <button type="button" class="topic-chip chat-chip">Gradient descent</button>
+                        <button type="button" class="topic-chip chat-chip">k-means clustering</button>
+                        <button type="button" class="topic-chip chat-chip">Overfitting</button>
+                        <button type="button" class="topic-chip chat-chip">Backpropagation</button>
+                        <button type="button" class="topic-chip chat-chip">Bias and variance</button>
+                    </div>
+                </div>
+            </div>
+
+            <form class="chat-composer" id="chatForm" autocomplete="off">
+                <div class="chat-box">
+                    <label class="sr-only" for="chatInput">Ask about a machine learning idea</label>
+                    <textarea id="chatInput" class="chat-input" rows="1" maxlength="2000"
+                              placeholder="Ask about any machine learning idea&hellip;"></textarea>
+
+                    <div class="chat-controls">
+                        <label class="sr-only" for="chatMode">Answer as</label>
+                        <select id="chatMode" class="chat-select">
+                            <option value="explain">Explain it</option>
+                            <option value="code">Write the code</option>
+                            <option value="audio">Read it aloud</option>
+                            <option value="images">Draw a diagram</option>
+                        </select>
+
+                        <label class="sr-only" for="chatLevel">Explain for</label>
+                        <select id="chatLevel" class="chat-select">
+                            <option value="Beginner">Beginner</option>
+                            <option value="Intermediate">Intermediate</option>
+                            <option value="Advanced">Advanced</option>
+                        </select>
+
+                        <label class="sr-only" for="chatWording">Reading level</label>
+                        <select id="chatWording" class="chat-select">
+                            <option value="Simple">Simple words</option>
+                            <option value="Standard">Standard words</option>
+                        </select>
+
+                        <span class="chat-controls-gap"></span>
+
+                        <button type="submit" id="chatSend" class="btn btn-primary chat-send">
+                            Send
+                        </button>
+                        <button type="button" id="chatStop" class="btn btn-danger chat-send" hidden>
+                            Stop
+                        </button>
+                    </div>
+                </div>
+                <p class="chat-hint">
+                    <kbd>Enter</kbd> sends, <kbd>Shift</kbd> + <kbd>Enter</kbd> starts a new line.
+                    Lessons are written by a language model - run the code and check it.
+                </p>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}
