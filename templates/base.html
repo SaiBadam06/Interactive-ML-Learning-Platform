@@ -40,19 +40,14 @@
     <nav class="navbar">
         <div class="nav-container">
             <a class="nav-brand" href="{{ url_for('index') }}">
-                {# A lamp, for a name that means knowledge and teacher. Kept to two shapes
-                   so it survives being 20px in a navbar. #}
+                {# A monogram: one shape, no metaphor, legible at any size. #}
                 <svg class="nav-logo" viewBox="0 0 32 32" role="img" aria-label="" focusable="false">
                     <rect width="32" height="32" rx="8" fill="currentColor"/>
-                    <!-- A lamp: the flame is the light being handed over, the
-                         bowl is what carries it. Two shapes, so it still reads
-                         at 20px, and it belongs to the name rather than to
-                         every other AI product. -->
-                    <path d="M16 6c3.4 3.9 5 6.3 5 8.6a5 5 0 0 1-10 0C11 12.3 12.6 9.9 16 6z"
-                          fill="var(--marker)"/>
-                    <path d="M9.5 21.5c1.9 2.6 4 3.9 6.5 3.9s4.6-1.3 6.5-3.9"
-                          fill="none" stroke="var(--accent-ink)" stroke-width="2.4"
-                          stroke-linecap="round"/>
+                    <!-- A G cut from a ring. Three metaphor marks were tried and
+                         rejected before this; a letterform has nothing to
+                         misread and holds its shape down to 16px. -->
+                    <path d="M21.5 11.5a7 7 0 1 0 .5 6H16" fill="none"
+                          stroke="var(--accent-ink)" stroke-width="2.8" stroke-linecap="round"/>
                 </svg>
                 <span>GyanGuru</span>
             </a>
