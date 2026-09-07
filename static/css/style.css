@@ -132,12 +132,12 @@ kbd {
 
 .container {
     width: 100%;
-    max-width: 1040px;
-    margin: 0 auto;
-    padding: 0 var(--s5);
+    max-width: none;        /* full bleed: the page uses the whole window */
+    margin: 0;
+    padding: 0 var(--s6);
 }
 
-.container-wide { max-width: 1180px; }
+.container-wide { max-width: none; }
 
 .main-content { padding: var(--s6) 0 var(--s8); flex: 1 0 auto; }
 
@@ -171,9 +171,9 @@ kbd {
 }
 
 .nav-container {
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: 0 var(--s5);
+    max-width: none;
+    margin: 0;
+    padding: 0 var(--s6);
     display: flex;
     align-items: center;
     gap: var(--s4);
@@ -1139,9 +1139,9 @@ textarea.form-control { min-height: 96px; }
        content and centre it - which put the switch in the middle of the page.
        An explicit width makes it span, so flex-end is a real right edge. */
     width: 100%;
-    max-width: 1180px;          /* matches .container-wide, the widest page */
-    margin: 0 auto;
-    padding: 0 var(--s5);
+    max-width: none;           /* tracks the full-bleed container */
+    margin: 0;
+    padding: 0 var(--s6);
     height: 0;                 /* takes no vertical space in the flow */
     pointer-events: none;      /* only the button is clickable */
 }
@@ -1155,6 +1155,15 @@ textarea.form-control { min-height: 96px; }
 @media (max-width: 700px) {
     .theme-dock { top: 65px; padding: 0 var(--s4); }
 }
+
+/* Full-bleed layout, tighter gutters on small screens where every pixel counts. */
+@media (max-width: 700px) {
+    .container, .nav-container, .theme-dock { padding: 0 var(--s4); }
+}
+
+/* The page is full width, but a line of prose is not readable at that width.
+   Reading columns keep their own cap so only the layout goes edge to edge. */
+.prose, .explanation-content, .follow-up-msg { max-width: var(--measure); }
 
 /* ---------- 7. Utilities ------------------------------------------------- */
 
