@@ -1497,8 +1497,33 @@ textarea.form-control { min-height: 96px; }
    thread fills what is left and the page itself does not scroll. */
 /* Fill whatever the page gives us rather than subtracting a measured guess for
    the nav and footer. The guess drifts the moment either changes, and whatever
-   it over-estimates shows up as dead space under the composer. */
-body:has(.chat-page) .main-content { display: flex; min-height: 0; padding-bottom: var(--s5); }
+   it over-estimates shows up as dead space under the composer.
+ *
+ * The three rules below are what make "the page itself does not scroll" true.
+ * It was not: body carries `min-height: 100vh` for the sticky footer, which is
+ * a floor and not a ceiling, and .main-content is `flex: 1 0 auto` - a shrink
+ * of zero. So nothing ever capped the height, the column grew to fit the whole
+ * conversation, and the page got a scrollbar while .chat-thread ended up with
+ * nothing to scroll inside it. Put the pointer over the middle of the
+ * conversation and the wheel did nothing at all: the thread swallowed it, had
+ * no scroll of its own to spend it on, and `overscroll-behavior: contain`
+ * stopped it reaching the page behind. Scrolling only worked over the rail or
+ * the footer.
+ *
+ * So: bound the body to the window, let main-content shrink, and drop the
+ * shell's 420px floor, which would otherwise push past the bottom now that
+ * there is a real ceiling. The thread is then the only thing that scrolls,
+ * which is what the comment above always claimed. */
+body:has(.chat-page) { height: 100vh; overflow: hidden; }
+@supports (height: 100dvh) { body:has(.chat-page) { height: 100dvh; } }
+
+body:has(.chat-page) .main-content {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-bottom: var(--s5);
+}
+body:has(.chat-page) .chat-shell { min-height: 0; }
 
 /* The centred 1120px column above is right for a page you read. It is wrong
    here: the chat is an app shell with a rail down the side, and on a 1920px
@@ -1584,6 +1609,13 @@ body:has(.chat-page) .main-content { display: flex; min-height: 0; padding-botto
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: var(--s2) var(--s2) var(--s5);
+    /* The thread is the only thing on this page that scrolls, so it is the only
+       thing with a scrollbar - and the scrollbar eats from its content box, not
+       from the composer's below it. That moved the centred conversation 8px
+       left of the centred composer, which is exactly the kind of gap you see
+       without being able to name. Reserving the gutter on both edges keeps the
+       two centred on the same axis whether the scrollbar is there or not. */
+    scrollbar-gutter: stable both-edges;
 }
 .chat-thread:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
@@ -1779,7 +1811,12 @@ body:has(.chat-page) .main-content { display: flex; min-height: 0; padding-botto
 
 /* --- Composer: pinned to the foot of the thread column, not the window --- */
 
-.chat-composer { flex: none; padding-top: var(--s3); }
+/* The same horizontal inset the thread has, so the box you type in and the
+   answers above it are measured from the same edges. Without it the composer
+   was two paddings wider than the conversation and the two centred columns
+   disagreed by 23px at narrower windows. What is left is one scrollbar gutter,
+   which only the thread can have. */
+.chat-composer { flex: none; padding: var(--s3) var(--s2) 0; }
 
 .chat-box {
     display: flex;
