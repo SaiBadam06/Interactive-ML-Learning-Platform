@@ -48,6 +48,9 @@
     --code-line: 21.6px;
 
     --measure: 76ch;
+    /* How wide the conversation runs. Prose caps itself at --measure; this is
+       what code blocks, diagrams and the composer share as one right edge. */
+    --chat-col: 58rem;
     color-scheme: light;
 }
 
@@ -1497,11 +1500,18 @@ textarea.form-control { min-height: 96px; }
    it over-estimates shows up as dead space under the composer. */
 body:has(.chat-page) .main-content { display: flex; min-height: 0; padding-bottom: var(--s5); }
 
+/* The centred 1120px column above is right for a page you read. It is wrong
+   here: the chat is an app shell with a rail down the side, and on a 1920px
+   window that column left 432px empty on each side, so the rail floated in the
+   middle of the screen while the navbar ran edge to edge above it. The shell
+   spans the window on the same gutter as the bar - the rail lines up under the
+   wordmark - and the conversation is what gets capped and centred instead. */
 .chat-page {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
+    max-width: none;
 }
 
 .chat-shell {
@@ -1608,12 +1618,10 @@ body:has(.chat-page) .main-content { display: flex; min-height: 0; padding-botto
 .chat-turn { margin-bottom: var(--s5); }
 .chat-turn:last-child { margin-bottom: 0; }
 
-/* Prose caps at --measure; code and diagrams get more room but not a whole
-   2560px monitor, and both turns share one right edge. */
-.chat-turn-assistant { max-width: 62rem; }
-
+/* The width of both turns is set by the reading-column block further down;
+   this only carries how the learner's turn lays its content out. */
 /* The learner's turn is a short remark, so it gets a bubble and the right edge. */
-.chat-turn-user { display: flex; justify-content: flex-end; max-width: 62rem; }
+.chat-turn-user { display: flex; justify-content: flex-end; }
 .chat-bubble {
     max-width: min(46rem, 88%);
     padding: var(--s3) var(--s4);
@@ -1890,16 +1898,21 @@ body:has(.chat-page) .chat-thread { padding-top: 46px; }
 /* Measured against ChatGPT on a 1536px screen: its answer column is 640px, not
    the width of the window. Ours ran the full 1500px, which is most of why a
    long answer read as a wall. One column, centred, for turns and composer
-   alike, so the eye returns to the same left edge every line. */
+   alike, so the eye returns to the same left edge every line.
+   --chat-col is that column and it is set in one place, because the turns, the
+   bubble, the composer and the hint all have to share the same two edges - a
+   composer half an inch wider than the answers above it is immediately visible.
+   Sentences are capped tighter still, by --measure, so widening this gives the
+   room to code and diagrams without stretching the prose. */
 
 .chat-turn,
 .chat-composer > .chat-box,
 .chat-hint {
-    max-width: 48rem;
+    max-width: var(--chat-col);
     margin-inline: auto;
 }
 .chat-turn-assistant,
-.chat-turn-user { max-width: 48rem; }
+.chat-turn-user { max-width: var(--chat-col); }
 
 /* Code and diagrams may break out; sentences may not. */
 .chat-prose { max-width: none; }

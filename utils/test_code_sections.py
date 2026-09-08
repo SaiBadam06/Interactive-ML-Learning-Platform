@@ -76,6 +76,37 @@ def test_a_title_with_real_words_is_left_alone():
     assert [s["title"] for s in _run(reply)][0] == "Setting learning_rate"
 
 
+def test_the_wording_header_does_not_leak_into_the_text():
+    """Seen live: with Simple wording every sentence came back prefixed
+    "Language: You import numpy for math. Language: You set a random seed." """
+    reply = json.dumps([
+        {"title": "A", "start_line": 1, "end_line": 10,
+         "explanation": "Language: You import numpy. Language: You set a seed."},
+        {"title": "B", "start_line": 11, "end_line": 20, "explanation": "Plain one."},
+    ])
+    texts = [s["explanation"] for s in _run(reply)]
+    assert "Language:" not in " ".join(texts), texts
+    assert texts[0] == "You import numpy. You set a seed."   # and capitalised
+    assert texts[1] == "Plain one."
+
+
+def test_a_lower_case_explanation_is_capitalised():
+    reply = json.dumps([
+        {"title": "A", "start_line": 1, "end_line": 10,
+         "explanation": "you import numpy and set a seed."},
+        {"title": "B", "start_line": 11, "end_line": 20, "explanation": "Already fine."},
+    ])
+    assert [s["explanation"] for s in _run(reply)] == [
+        "You import numpy and set a seed.", "Already fine."]
+
+
+def test_the_prompt_no_longer_carries_that_header():
+    rules = genai_utils._wording_rules("Simple")
+    assert rules and "Language:" not in rules
+    assert "Keep sentences short" in rules          # the actual rules survive
+    assert genai_utils._wording_rules("Standard") == ""
+
+
 def test_unusable_replies_degrade_to_empty():
     for reply in ("not json at all", "[]", None, "[{}]",
                   json.dumps([{"title": "A", "start_line": 1, "end_line": 5, "explanation": ""}])):

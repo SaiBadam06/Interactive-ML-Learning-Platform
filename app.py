@@ -1064,11 +1064,18 @@ def api_chat():
                                 wording=WORDING.get(wording, ''))
     system += MODE_SYSTEM.get(mode, '')
     messages = [{'role': 'system', 'content': system}] + turns
-    # muse-glimmer everywhere, including prose, which the page-based flows do not
-    # do. Measured on this endpoint: muse puts its first word on screen at 4.2 s,
-    # nemotron at 17.3 s. Nemotron writes better prose, but seventeen seconds of
-    # silence in a chat reads as broken, and the learner can always ask again.
-    model = NIM_CODE_MODEL
+    # nemotron with its scratchpad turned off. Muse was here on the strength of a
+    # 4.2 s first word against nemotron's 17.3 s, and both of those numbers have
+    # since gone: measured again on this endpoint, every request carrying a
+    # system prompt - which is every request - reasons for over 75 s and dies on
+    # the thinking budget below. The same question with no instructions comes
+    # back in 2.9 s, so it is the steering that sets them reasoning, and no
+    # rewording of it helped. Turning the scratchpad off is what fixed it, and it
+    # only works on nemotron:
+    #     nemotron, no scratchpad   1.6 s to the first word
+    #     nemotron, reasoning        no word in 45 s
+    #     muse, either way           no word in 45 s
+    model = NIM_TEXT_MODEL
 
     # The scratchpad is never forwarded, only the fact that one is being written.
     #
@@ -1088,7 +1095,8 @@ def api_chat():
         beat = 0.0                           # last heartbeat, seconds since start
         seen_content = False
         try:
-            for kind, piece in stream_chat(api_key, messages, model=model):
+            for kind, piece in stream_chat(api_key, messages, model=model,
+                                         thinking=False):
                 if kind == 'thinking':
                     elapsed = time.monotonic() - started
                     # A reasoning model can think for minutes. Rather than leave

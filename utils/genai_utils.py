@@ -156,6 +156,27 @@ def call_followup(api_key, topic, context, history, question, level="Beginner",
             return answer
     return None
 
+def _wording_rules(wording):
+    """The wording block's rules, without its "Language: ..." header line."""
+    body = WORDING.get(wording, "")
+    lines = [line for line in body.splitlines() if not line.startswith("Language:")]
+    return "\n".join(lines).strip("\n")
+
+
+def _section_explanation(raw):
+    """One section's explanation, with any leaked prompt header taken off.
+
+    Belt and braces around the prompt fix above: the model copied "Language:"
+    into the middle of its sentences as well as the front, so a header that gets
+    through anyway is removed from the text rather than shown to the learner.
+    """
+    text = re.sub(r"\bLanguage:\s*", "", str(raw or "")).strip()
+    text = re.sub(r"\s{2,}", " ", text)
+    # Simple wording comes back in lower case often enough to be worth fixing;
+    # it sits under a heading, so a lower-case opening reads as a typo.
+    return text[:1].upper() + text[1:] if text else text
+
+
 def _section_title(raw):
     """A heading, from whatever the model called the section.
 
@@ -200,7 +221,13 @@ def explain_code_sections(api_key, code, topic=None, wording="Standard"):
         "the JSON; write explanations in plain sentence case with no markdown.\n"
         # The wording block only ever constrains the "explanation" strings; the JSON
         # shape above is fixed and is not up for rephrasing.
-        + (("\nWrite each explanation this way:\n" + WORDING[wording])
+        #
+        # Its first line is a header - "Language: plain and easy to read." - and it
+        # is dropped here. Left in, the model read it as a pattern to follow and
+        # prefixed every sentence it wrote with it: "Language: You import numpy for
+        # math. Language: You set a random seed." The sentence above already says
+        # what the block is for, so the header earns nothing.
+        + (("\nWrite each explanation this way:\n" + _wording_rules(wording))
            if WORDING.get(wording) else "")
     )
 
@@ -236,7 +263,7 @@ def explain_code_sections(api_key, code, topic=None, wording="Standard"):
             end = max(start, min(end, len(lines)))
             snippet = "\n".join(lines[start - 1:end]).strip("\n")
             title = _section_title(item.get("title"))
-            explanation = str(item.get("explanation") or "").strip()
+            explanation = _section_explanation(item.get("explanation"))
             if not snippet.strip() or not explanation:
                 continue
             sections.append({
@@ -640,19 +667,30 @@ After the written explanation, output 2-3 image prompts. Each one must start on 
 # leaves a spinner up for 15-90 s; streaming puts words on screen in about a
 # second, which is the whole reason the chat interface is worth having.
 
-def stream_chat(api_key, messages, model=None, max_tokens=4096, temperature=0.7):
+def stream_chat(api_key, messages, model=None, max_tokens=4096, temperature=0.7,
+                thinking=True):
     """Yield ("thinking" | "content", text) as the model produces it.
 
-    Two things are deliberate here:
+    ``thinking=False`` sends ``chat_template_kwargs={"thinking": False}``, which
+    turns the scratchpad off at the model rather than filtering it here.
 
-    * ``chat_template_kwargs={"thinking": False}`` is NOT sent. It works for a
-      normal call, but on the streaming endpoint it suppresses the answer
-      entirely - measured: 1926 characters of reasoning and zero of content.
-      The scratchpad is separated here instead, and the caller decides whether
-      to show it.
-    * Reasoning arrives as ``delta.reasoning_content`` and the answer as
-      ``delta.content``. They are kept apart so the scratchpad can never be
-      mistaken for the lesson.
+    That used to be unusable and the note here said so: on the streaming
+    endpoint it suppressed the answer entirely, 1926 characters of reasoning and
+    zero of content. Re-measured against both models we call:
+
+        nemotron  + thinking=False   first word 1.6s, no scratchpad, full answer
+        nemotron  (reasoning on)     no word in 45s
+        muse      + thinking=False   no word in 45s  <- still broken, as noted
+        muse      (reasoning on)     no word in 45s
+
+    So it is per-model, and it works on nemotron. It matters because any system
+    prompt at all sends these models into minutes of reasoning - the same
+    question with no instructions answers in 2.9s - and the chat had reached the
+    point where every message hit the thinking budget and errored.
+
+    Reasoning, when it is on, arrives as ``delta.reasoning_content`` and the
+    answer as ``delta.content``. They are kept apart so the scratchpad can never
+    be mistaken for the lesson.
     """
     model = model or NIM_TEXT_MODEL
     payload = {
@@ -662,6 +700,8 @@ def stream_chat(api_key, messages, model=None, max_tokens=4096, temperature=0.7)
         "temperature": temperature,
         "stream": True,
     }
+    if not thinking:
+        payload["chat_template_kwargs"] = {"thinking": False}
     response = requests.post(
         NIM_CHAT_URL,
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
