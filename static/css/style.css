@@ -1521,9 +1521,16 @@ body:has(.chat-page) .main-content {
     display: flex;
     flex: 1 1 auto;
     min-height: 0;
-    padding-bottom: var(--s5);
+    padding-bottom: 0;
 }
 body:has(.chat-page) .chat-shell { min-height: 0; }
+
+/* Now that the page is pinned to the window, every pixel the footer takes is a
+   pixel off the conversation. One line of small print needs 24px of air above
+   and below it on a page you scroll; here it needed 95px of the window between
+   the composer and the bottom edge - a gap you read as the layout being wrong.
+   Tightened to the line itself, and the gap above it goes to zero. */
+body:has(.chat-page) .footer { padding: var(--s2) 0; font-size: 13px; }
 
 /* The centred 1120px column above is right for a page you read. It is wrong
    here: the chat is an app shell with a rail down the side, and on a 1920px
