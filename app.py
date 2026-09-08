@@ -14,13 +14,15 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
 import base64
 import tempfile
+from urllib.parse import quote
 
 # Import utility modules
 from utils.genai_utils import (call_genai, call_followup, explain_code_sections,
                                generate_quiz, stream_chat, AUDIENCE, WORDING, SCOPE,
                                _extract_code, NIM_TEXT_MODEL, NIM_CODE_MODEL)
 from utils.audio_utils import text_to_audio
-from utils.code_executor import detect_dependencies, save_code_to_file
+from utils.code_executor import (detect_dependencies, describe_packages,
+                                 save_code_to_file)
 from utils.image_utils import generate_images, get_model_info
 from utils import auth, quota
 
@@ -850,7 +852,91 @@ def model_info():
 # that same text and send it as a final event - the learner is already reading
 # while the file is being made.
 
-VALID_MODES = {'explain', 'code', 'audio', 'images'}
+VALID_MODES = {'explain', 'code', 'audio', 'images', 'walkthrough'}
+
+# What the page shows while each mode runs, so an inferred choice is visible
+# rather than something that silently happened to the learner.
+MODE_LABEL = {
+    'explain': 'Explaining it',
+    'code': 'Writing the program',
+    'audio': 'Reading it aloud',
+    'images': 'Drawing it',
+    'walkthrough': 'Reading your code',
+}
+
+# ---------------------------------------------------------------- mode routing
+# The composer used to make the learner pick the mode before asking. They know
+# what they want in the words they already typed, so those are read instead and
+# the picker is only there to override it.
+#
+# Deliberately keywords and not a model call: routing has to happen before the
+# first token, and a second round trip to decide what to do would add its own
+# latency to every single message.
+
+# A fence, with whatever the model or the learner labelled it.
+_FENCE = re.compile(r'```[\w+.\-]*\r?\n(.*?)(?:```|\Z)', re.DOTALL)
+
+# Lines that are Python rather than a sentence about Python. An `=` alone is not
+# enough - "accuracy = 0.9" is a thing people write in prose.
+_CODE_LINE = re.compile(
+    r'^\s*(?:import\s+\w|from\s+[\w.]+\s+import\s|def\s+\w+\s*\(|'
+    r'class\s+\w+\s*[:(]|return\s|for\s+\w+\s+in\s+.+:|while\s+.+:|'
+    r'if\s+.+:|elif\s+.+:|else\s*:|try\s*:|except\b|with\s+.+:|@\w+|'
+    r'print\s*\(|\w+\s*=\s*\w+\s*[.(\[])',
+    re.MULTILINE)
+
+_WANT_AUDIO = re.compile(
+    r'\b(listen|aloud|out loud|audio|narrat\w*|podcast|say it|read it to me|'
+    r'hear (?:it|this)|spoken|voice)\b', re.I)
+_WANT_IMAGES = re.compile(
+    r'\b(diagram|picture|image|draw|drawing|sketch|visual\w*|illustrat\w*|'
+    r'flowchart|chart of|show me what)\b', re.I)
+_WANT_CODE = re.compile(
+    r'\b(code|program|script|implement\w*|snippet|in python|notebook|'
+    r'write (?:me )?(?:a|the)\b)', re.I)
+
+
+def extract_pasted_code(text):
+    """The code in a message, or ''.
+
+    A fence wins outright. Without one, the message itself counts as code only
+    when several lines are unmistakably Python - otherwise "if the loss is high
+    then the model is underfitting" would be read as a program.
+    """
+    text = str(text or '')
+    fenced = [block.strip() for block in _FENCE.findall(text)]
+    fenced = [block for block in fenced if block]
+    if fenced:
+        return max(fenced, key=len)
+
+    lines = [line for line in text.splitlines() if line.strip()]
+    if len(lines) >= 3 and len(_CODE_LINE.findall(text)) >= 2:
+        return text.strip()
+    return ''
+
+
+def route_mode(text):
+    """Which mode the learner's own words ask for. Never raises."""
+    text = str(text or '')
+
+    # Code in the message is the strongest signal there is - unless they said
+    # plainly that they want to hear it or see it drawn instead.
+    if extract_pasted_code(text):
+        if _WANT_AUDIO.search(text):
+            return 'audio'
+        if _WANT_IMAGES.search(text):
+            return 'images'
+        return 'walkthrough'
+
+    # Most specific first: "read it aloud" and "draw me a diagram" mean one
+    # thing each, where "code" turns up in questions that are not asking for any.
+    if _WANT_AUDIO.search(text):
+        return 'audio'
+    if _WANT_IMAGES.search(text):
+        return 'images'
+    if _WANT_CODE.search(text):
+        return 'code'
+    return 'explain'
 
 # How long a reply may spend reasoning before producing a word.
 THINKING_BUDGET = 75          # seconds
@@ -891,6 +977,16 @@ MODE_SYSTEM = {
         "a voice cannot say. Never write stage directions such as [pause]. Aim for "
         "about 250 words.\n"
     ),
+    'walkthrough': (
+        "\nThe learner has pasted code and wants to understand it. Explain their "
+        "code - do not rewrite it, do not paste it back, and do not suggest "
+        "improvements unless they asked for them. Cover, in this order: what the "
+        "program does as a whole, in two or three sentences; what it needs to run "
+        "and what it prints or produces; and the one idea somebody has to grasp "
+        "before the rest of it makes sense. A section-by-section breakdown and the "
+        "list of packages are added underneath automatically, so do not produce "
+        "either yourself.\n"
+    ),
     'images': (
         "\nThe learner wants a picture of this. First explain the idea in a few "
         "sentences. Then, on their own lines at the very end, write exactly three "
@@ -900,7 +996,8 @@ MODE_SYSTEM = {
 }
 
 # Which quota bucket each mode spends.
-MODE_QUOTA = {'explain': 'text', 'code': 'code', 'audio': 'audio', 'images': 'images'}
+MODE_QUOTA = {'explain': 'text', 'code': 'code', 'audio': 'audio', 'images': 'images',
+              'walkthrough': 'sections'}
 
 
 def _sse(event):
@@ -926,7 +1023,10 @@ def api_chat():
     if not api_key:
         return jsonify({'error': 'API key is required'}), 400
 
-    mode = data.get('mode') if data.get('mode') in VALID_MODES else 'explain'
+    # 'auto' - the default - means read it off the question. Anything else is
+    # the learner overriding that from the picker.
+    wanted = data.get('mode')
+    mode = wanted if wanted in VALID_MODES else 'auto'
     level = data.get('level') if data.get('level') in VALID_LEVELS else 'Beginner'
     wording = data.get('wording') if data.get('wording') in VALID_WORDINGS else 'Standard'
 
@@ -937,11 +1037,27 @@ def api_chat():
              and str(m.get('content') or '').strip()]
     if not turns or turns[-1]['role'] != 'user':
         return jsonify({'error': 'The last message must be yours.'}), 400
-    topic = turns[-1]['content'][:120]
+    question = turns[-1]['content']
+    topic = question[:120]
+
+    if mode == 'auto':
+        mode = route_mode(question)
+    # Only the walkthrough needs the code itself; extracting it for every mode
+    # would run the pattern over messages that have none.
+    pasted = extract_pasted_code(question) if mode == 'walkthrough' else ''
+    if mode == 'walkthrough' and not pasted:
+        mode = 'explain'                        # nothing to walk through after all
 
     over_quota = spend_quota(MODE_QUOTA[mode])
     if over_quota:
         return over_quota
+
+    # Same reason as everything else resolved out here: url_for needs the app
+    # context, and Flask has torn it down by the time the generator runs. Called
+    # from inside, it raised, the surrounding except swallowed it, and every
+    # recording ever made was reported as "could not be recorded". The filename
+    # is only known in there, so the prefix is what gets carried in.
+    audio_url = url_for('download_audio', filename='')
 
     system = CHAT_SYSTEM.format(scope=SCOPE,
                                 audience=AUDIENCE.get(level, AUDIENCE['Beginner']),
@@ -966,6 +1082,9 @@ def api_chat():
     def events():
         answer = []
         started = time.monotonic()
+        # Sent before the first token so the learner sees which way the question
+        # was read, and can change it with the picker if it was read wrongly.
+        yield _sse({'type': 'route', 'mode': mode, 'label': MODE_LABEL.get(mode, '')})
         beat = 0.0                           # last heartbeat, seconds since start
         seen_content = False
         try:
@@ -1019,13 +1138,31 @@ def api_chat():
             try:
                 filename = text_to_audio(text, topic or 'lesson')
                 if filename:
-                    done['audio'] = url_for('download_audio', filename=filename)
+                    done['audio'] = audio_url + quote(filename)
                     done['audio_name'] = filename
                 else:
                     done['note'] = 'The audio could not be recorded, but the script is above.'
             except Exception:
                 logger.warning("chat audio failed", exc_info=True)
                 done['note'] = 'The audio could not be recorded, but the script is above.'
+
+        elif mode == 'walkthrough':
+            # The prose above says what the program is; these two say what each
+            # part of it does and what has to be installed for it to run. The
+            # packages are read straight off the imports, so they cost nothing
+            # and cannot be invented; the sections are a second model call, which
+            # is why the page is told what is happening before it starts.
+            done['code'] = pasted
+            done['packages'] = describe_packages(pasted)
+            yield _sse({'type': 'working', 'label': 'Breaking it into sections'})
+            try:
+                done['sections'] = explain_code_sections(api_key, pasted, topic, wording)
+            except Exception:
+                logger.warning("chat walkthrough sections failed", exc_info=True)
+                done['sections'] = []
+            if not done['sections']:
+                done['note'] = ('The section-by-section breakdown could not be built for '
+                                'this one, but the explanation above still covers it.')
 
         elif mode == 'images':
             prompts = [line.split('DIAGRAM:', 1)[1].strip()

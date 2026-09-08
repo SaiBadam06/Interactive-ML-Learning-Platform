@@ -35,8 +35,9 @@
                  aria-label="Conversation" tabindex="0">
                 <div class="chat-empty" id="chatEmpty">
                     <h1 class="chat-empty-title">What shall we learn?</h1>
-                    <p class="chat-empty-sub">Name a machine learning idea. Ask again in simpler
-                       words whenever an answer goes over your head.</p>
+                    <p class="chat-empty-sub">Name a machine learning idea, or paste code to have it
+                       explained a section at a time. Ask again in simpler words whenever an
+                       answer goes over your head.</p>
                     <div class="chat-suggestions" id="chatSuggestions">
                         <button type="button" class="topic-chip chat-chip">Q-learning</button>
                         <button type="button" class="topic-chip chat-chip">Gradient descent</button>
@@ -51,13 +52,21 @@
             <form class="chat-composer" id="chatForm" autocomplete="off">
                 <div class="chat-box">
                     <label class="sr-only" for="chatInput">Ask about a machine learning idea</label>
-                    <textarea id="chatInput" class="chat-input" rows="1" maxlength="2000"
-                              placeholder="Ask about any machine learning idea&hellip;"></textarea>
+                    {# 6000 is what the server keeps per turn. It was 2000, which is
+                       under a hundred lines of Python - too short to paste in the
+                       kind of program people want explained. #}
+                    <textarea id="chatInput" class="chat-input" rows="1" maxlength="6000"
+                              placeholder="Ask about any machine learning idea, or paste code&hellip;"></textarea>
 
                     <div class="chat-controls">
+                        {# Auto is the default and the point: ask in your own words and
+                           the question decides. The rest stay as an override for when
+                           it reads one wrongly. #}
                         <label class="sr-only" for="chatMode">Answer as</label>
                         <select id="chatMode" class="chat-select">
+                            <option value="auto">Work it out from my question</option>
                             <option value="explain">Explain it</option>
+                            <option value="walkthrough">Walk through my code</option>
                             <option value="code">Write the code</option>
                             <option value="audio">Read it aloud</option>
                             <option value="images">Draw a diagram</option>

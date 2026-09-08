@@ -30,7 +30,8 @@
 
     const THREAD_KEY = 'chatThread';
     const RECENT_KEY = 'recentTopics';         // shared with main.js
-    const MODES = ['explain', 'code', 'audio', 'images'];
+    // 'auto' is the default: the server reads the mode off the question itself.
+    const MODES = ['auto', 'explain', 'walkthrough', 'code', 'audio', 'images'];
     const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
     const WORDINGS = ['Simple', 'Standard'];
     const MAX_TURNS = 40;                      // what is kept across a reload
@@ -302,6 +303,12 @@
         think.setAttribute('role', 'status');
         think.textContent = 'Thinking…';
 
+        // What the question was taken to be asking. It stays on the finished
+        // turn: an inference the learner cannot see is one they cannot correct.
+        const badge = document.createElement('p');
+        badge.className = 'chat-route';
+        badge.hidden = true;
+
         const prose = document.createElement('div');
         prose.className = 'chat-prose';
 
@@ -316,13 +323,14 @@
         actions.className = 'chat-actions';
 
         turn.appendChild(think);
+        turn.appendChild(badge);
         turn.appendChild(prose);
         turn.appendChild(status);
         turn.appendChild(extras);
         turn.appendChild(actions);
         thread.appendChild(turn);
 
-        return { turn, think, prose, status, extras, actions };
+        return { turn, think, badge, prose, status, extras, actions };
     }
 
     // Copy is useful; Simplify is the reason this page exists. It leads, and it
@@ -449,7 +457,118 @@
         return grid;
     }
 
+    // Every module the program imports, split into what has to be installed and
+    // what ships with Python, with one line each on why it is there. Read off
+    // the imports on the server, so these are the real packages, not guesses.
+    function packagesBlock(packages) {
+        const wrap = document.createElement('section');
+        wrap.className = 'chat-packages';
+
+        const heading = document.createElement('h3');
+        heading.textContent = 'What it needs';
+        wrap.appendChild(heading);
+
+        const list = document.createElement('dl');
+        list.className = 'package-list';
+        packages.forEach(function (pkg) {
+            const term = document.createElement('dt');
+            const name = document.createElement('code');
+            name.textContent = String(pkg.name || '');
+            term.appendChild(name);
+            if (pkg.stdlib) {
+                const tag = document.createElement('span');
+                tag.className = 'package-tag';
+                tag.textContent = 'built in';
+                term.appendChild(tag);
+            }
+            const detail = document.createElement('dd');
+            detail.textContent = String(pkg.role || '');
+            list.appendChild(term);
+            list.appendChild(detail);
+        });
+        wrap.appendChild(list);
+
+        // One command that installs everything missing, ready to copy.
+        const install = packages.filter(function (pkg) { return pkg.pip; })
+                                .map(function (pkg) { return pkg.pip; });
+        if (install.length) {
+            // Same row the Code page builds for its dependencies, so a command
+            // to copy looks the same wherever it turns up.
+            const command = 'pip install ' + install.join(' ');
+            const row = document.createElement('div');
+            row.className = 'install-command';
+            const text = document.createElement('code');
+            text.textContent = command;
+            row.appendChild(text);
+            row.appendChild(makeBtn('Copy', 'btn btn-outline install-copy', function () {
+                window.copyToClipboard(command);
+            }));
+            wrap.appendChild(row);
+        } else {
+            const note = document.createElement('p');
+            note.className = 'section-hint';
+            note.textContent = 'Nothing to install - it only uses what ships with Python.';
+            wrap.appendChild(note);
+        }
+        return wrap;
+    }
+
+    // Each block of the program beside what it does. Same shape as the Code
+    // page's walkthrough, so the two read alike.
+    function sectionsBlock(sections) {
+        const wrap = document.createElement('section');
+        wrap.className = 'chat-sections code-sections';
+
+        const heading = document.createElement('h3');
+        heading.textContent = 'Section by section';
+        wrap.appendChild(heading);
+
+        sections.forEach(function (section) {
+            const item = document.createElement('div');
+            item.className = 'code-section';
+
+            const title = document.createElement('h4');
+            title.className = 'code-section-title';
+            title.textContent = String(section.title || '');
+            const lines = document.createElement('span');
+            lines.className = 'code-section-lines';
+            lines.textContent = 'lines ' + section.start_line + '-' + section.end_line;
+            title.appendChild(lines);
+
+            const pre = document.createElement('pre');
+            pre.className = 'code-section-code';
+            const code = document.createElement('code');
+            code.className = 'language-python';
+            code.textContent = String(section.code || '');
+            pre.appendChild(code);
+            if (window.Prism) window.Prism.highlightElement(code);
+
+            const explanation = document.createElement('p');
+            explanation.className = 'code-section-explanation';
+            explanation.textContent = String(section.explanation || '');
+
+            const ask = document.createElement('div');
+            ask.className = 'code-section-ask';
+            ask.appendChild(makeBtn('Ask about this part', 'btn btn-quiet', function () {
+                fillComposer('About the "' + (section.title || 'this') + '" part: ');
+            }));
+
+            item.appendChild(title);
+            item.appendChild(pre);
+            item.appendChild(explanation);
+            item.appendChild(ask);
+            wrap.appendChild(item);
+        });
+        return wrap;
+    }
+
     function renderExtras(view, done) {
+        if (Array.isArray(done.packages) && done.packages.length) {
+            view.extras.appendChild(packagesBlock(done.packages));
+        }
+        if (Array.isArray(done.sections) && done.sections.length) {
+            view.extras.appendChild(sectionsBlock(done.sections));
+        }
         if (done.code) view.extras.appendChild(codeBlock(done.code));
         if (done.audio) view.extras.appendChild(audioBlock(done.audio, done.audio_name));
         if (Array.isArray(done.images) && done.images.length) {
@@ -485,7 +604,13 @@
     }
 
     function handleEvent(event, view) {
-        if (event.type === 'thinking') {
+        if (event.type === 'route') {
+            if (event.label) {
+                view.badge.hidden = false;
+                view.badge.textContent = String(event.label);
+                view.turn.dataset.mode = String(event.mode || '');
+            }
+        } else if (event.type === 'thinking') {
             if (view.think.isConnected) {
                 const seconds = Number(event.seconds) || 0;
                 view.think.hidden = false;
@@ -666,7 +791,7 @@
         if (controller) controller.abort();
     });
 
-    modeSel.value = pref('chatMode', MODES, 'explain');
+    modeSel.value = pref('chatMode', MODES, 'auto');
     modeSel.addEventListener('change', () => savePref('chatMode', modeSel.value));
 
     levelSel.value = pref('chatLevel', LEVELS, 'Beginner');

@@ -173,7 +173,12 @@ kbd {
     border-bottom: 1px solid var(--hairline);
     position: sticky;
     top: 0;
-    z-index: 40;
+    /* Sticky + z-index makes this a stacking context, so the drawer inside it
+       cannot climb over anything on its own: whatever z-index .nav-menu carries
+       is resolved *within* this number. It has to sit above .nav-backdrop (45)
+       or the backdrop covers the open drawer and every link in it is dead.
+       Below .toast (60) and .modal (70), which must still cover the bar. */
+    z-index: 50;
 }
 
 .nav-container {
@@ -1276,8 +1281,10 @@ textarea.form-control { min-height: 96px; }
 .nav-dropdown-link[aria-current="page"] { color: var(--accent); font-weight: 500; }
 
 /* On a phone the bar is already a stacked panel, so the menu sits inline
-   rather than floating over it. */
-@media (max-width: 860px) {
+   rather than floating over it. This breakpoint must match the one the drawer
+   opens at (768px) - when they differed, the range in between got an inline
+   list unfolding into a horizontal bar. */
+@media (max-width: 768px) {
     .nav-dropdown {
         position: static;
         min-width: 0;
@@ -1351,10 +1358,18 @@ textarea.form-control { min-height: 96px; }
         background: var(--surface);
         border-left: 1px solid var(--hairline);
         transform: translateX(100%);
-        transition: transform 180ms ease;
+        /* Off-screen is not closed: without this the links stay in the tab
+           order and Tab walks into a drawer nobody can see. Delayed on the way
+           out so the slide is still visible. */
+        visibility: hidden;
+        transition: transform 180ms ease, visibility 0s linear 180ms;
         overflow-y: auto;
     }
-    .nav-menu.active { transform: none; }
+    .nav-menu.active {
+        transform: none;
+        visibility: visible;
+        transition: transform 180ms ease, visibility 0s;
+    }
 
     .nav-link {
         min-height: 44px;
@@ -1606,6 +1621,11 @@ body:has(.chat-page) .main-content { display: flex; min-height: 0; padding-botto
     border-radius: var(--r-card);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    /* A pasted program is a normal message here, and a long one pushed the
+       answer to it off the screen. Capped and scrolled, so what was asked stays
+       visible without burying what came back. */
+    max-height: 18rem;
+    overflow-y: auto;
 }
 
 /* The answer is the page, not a remark in it: full width, no bubble. */
@@ -1668,6 +1688,80 @@ body:has(.chat-page) .main-content { display: flex; min-height: 0; padding-botto
 .chat-caption { margin: var(--s2) 0 0; color: var(--ink-muted); }
 .chat-note { margin: 0; }
 .chat-error { margin: 0; }
+
+/* --- How the question was read ------------------------------------------- */
+/* The composer no longer makes anyone choose a mode, so the turn has to say
+   which one it picked. Quiet: it is a label on the answer, not a heading. */
+
+.chat-route {
+    margin: 0 0 var(--s2);
+    color: var(--ink-muted);
+    font-size: 13px;
+    letter-spacing: .01em;
+}
+.chat-route::before {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: var(--s2);
+    border-radius: 50%;
+    background: var(--marker);
+    vertical-align: middle;
+}
+
+/* --- Pasted code: what it needs, and what each part of it does ------------ */
+
+.chat-packages, .chat-sections { min-width: 0; }
+.chat-packages > h3, .chat-sections > h3 {
+    margin: 0 0 var(--s3);
+    font-size: 1.05rem;
+}
+
+.package-list {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--s2) var(--s4);
+    align-items: baseline;
+    margin: 0 0 var(--s4);
+}
+.package-list dt {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s2);
+    font-weight: 500;
+}
+.package-list dd { margin: 0; color: var(--ink-muted); line-height: 1.5; }
+
+.package-tag {
+    padding: 0 var(--s2);
+    border-radius: var(--r-chip);
+    background: var(--surface-2);
+    color: var(--ink-muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* The breakdown sits inside a turn that is already narrower than the Code
+   page, so the code and its note stack rather than sitting side by side. */
+.chat-sections .code-section {
+    grid-template-columns: minmax(0, 1fr);
+    padding-left: var(--s3);
+}
+.chat-sections .code-section-code,
+.chat-sections .code-section-title,
+.chat-sections .code-section-explanation,
+.chat-sections .code-section-ask {
+    grid-column: 1;
+    grid-row: auto;
+}
+
+/* One column everywhere the turn gets narrow: a name and its line wrapping
+   under each other beats a max-content column squeezing the prose to nothing. */
+@media (max-width: 700px) {
+    .package-list { grid-template-columns: minmax(0, 1fr); gap: var(--s1) 0; }
+    .package-list dd { margin-bottom: var(--s3); }
+}
 
 /* Simplify is why this page exists, so it leads and it is the only primary
    button in a finished turn. */

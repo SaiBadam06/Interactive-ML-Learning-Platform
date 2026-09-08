@@ -156,6 +156,20 @@ def call_followup(api_key, topic, context, history, question, level="Beginner",
             return answer
     return None
 
+def _section_title(raw):
+    """A heading, from whatever the model called the section.
+
+    Asked for "a short name", models hand back an identifier about half the
+    time - `imports_and_data`, `forward_pass_and_gradient_computation`. That
+    reads as code in the middle of prose, and the prompt cannot be relied on to
+    stop it, so it is undone here instead.
+    """
+    title = str(raw or "").strip()[:80]
+    if "_" in title and " " not in title:
+        title = title.replace("_", " ")
+    return title[:1].upper() + title[1:] if title else title
+
+
 def explain_code_sections(api_key, code, topic=None, wording="Standard"):
     """
     Split a generated program into consecutive sections and explain each one.
@@ -221,7 +235,7 @@ def explain_code_sections(api_key, code, topic=None, wording="Standard"):
             start = max(1, min(start, len(lines)))
             end = max(start, min(end, len(lines)))
             snippet = "\n".join(lines[start - 1:end]).strip("\n")
-            title = str(item.get("title") or "").strip()[:80]
+            title = _section_title(item.get("title"))
             explanation = str(item.get("explanation") or "").strip()
             if not snippet.strip() or not explanation:
                 continue

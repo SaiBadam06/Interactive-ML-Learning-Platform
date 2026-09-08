@@ -1,5 +1,8 @@
+import ast
 import os
+import re
 import secrets
+import sys
 import logging
 from datetime import datetime
 
@@ -38,6 +41,141 @@ def detect_dependencies(code):
             dependencies.append(package_name)
     
     return list(set(dependencies))  # Remove duplicates
+
+
+# ---------------------------------------------------------------- packages
+# What a learner needs to know about an import is three things: does it have to
+# be installed, what is it installed as, and what is it doing here. None of that
+# has to come from the model, so none of it does - a hallucinated pip name is a
+# command that fails on their machine.
+
+# Import name -> pip name, only where the two differ. Everything else installs
+# under the name it is imported by.
+PIP_NAMES = {
+    'sklearn': 'scikit-learn',
+    'cv2': 'opencv-python',
+    'PIL': 'Pillow',
+    'skimage': 'scikit-image',
+    'yaml': 'PyYAML',
+    'bs4': 'beautifulsoup4',
+    'dateutil': 'python-dateutil',
+    'gym': 'gymnasium',
+    'mpl_toolkits': 'matplotlib',
+}
+
+# One line on what each one is doing in a machine learning program. Only the
+# libraries this subject actually reaches for; anything else gets a truthful
+# generic line rather than a guess.
+PACKAGE_ROLES = {
+    'numpy': 'Arrays and the maths on them. Nearly every other library here takes and returns numpy arrays.',
+    'pandas': 'Tables of data - loading a CSV, selecting columns, grouping rows.',
+    'matplotlib': 'Plotting. Draws the loss curves, scatter plots and decision boundaries.',
+    'seaborn': 'Statistical plots on top of matplotlib, with better defaults.',
+    'sklearn': 'Classical machine learning: the models, the train/test split, and the scoring metrics.',
+    'scipy': 'Scientific computing - optimisation, statistics, distances, sparse matrices.',
+    'torch': 'PyTorch. Builds the network, holds the tensors, and works out the gradients.',
+    'torchvision': 'Image datasets, pretrained vision models and image transforms for PyTorch.',
+    'tensorflow': 'TensorFlow. Builds and trains the network, and works out the gradients.',
+    'keras': 'A high-level way to stack layers into a model and train it.',
+    'xgboost': 'Gradient-boosted trees - usually the strongest thing to try on table data.',
+    'lightgbm': 'Gradient-boosted trees, built to be fast on large datasets.',
+    'transformers': 'Pretrained language and vision models, and the tokenisers that feed them.',
+    'datasets': 'Loads and streams the datasets that go with the transformers library.',
+    'cv2': 'OpenCV. Reading, resizing and transforming images.',
+    'PIL': 'Pillow. Opening, converting and saving image files.',
+    'skimage': 'Image processing built on numpy arrays.',
+    'gym': 'Reinforcement learning environments - the world the agent acts in.',
+    'plotly': 'Interactive charts you can hover and zoom.',
+    'statsmodels': 'Statistical models and tests, with the coefficient tables to read them.',
+    'nltk': 'Classical natural language tools - tokenising, stemming, stopwords.',
+    'spacy': 'Industrial natural language pipelines: tokens, entities, dependencies.',
+    'joblib': 'Saving a fitted model to disk and loading it back.',
+    'tqdm': 'The progress bar around a training loop.',
+    # Standard library, where its role in a program like this is worth naming.
+    'random': 'Random numbers. Usually seeded here so a run can be repeated.',
+    'math': 'Single-number maths - square roots, logs, exponentials.',
+    'os': 'Paths, directories and environment variables.',
+    'time': 'Timing how long something takes, or pausing.',
+    'json': 'Reading and writing JSON.',
+    'collections': 'Extra container types - counters, default dicts, deques for replay buffers.',
+    'itertools': 'Building and combining iterators without writing the loops by hand.',
+    'dataclasses': 'Small classes that only hold data, without the boilerplate.',
+    'typing': 'Type hints. They document the code and change nothing at runtime.',
+    'csv': 'Reading and writing CSV files.',
+    'pickle': 'Saving Python objects to disk. Only ever load a pickle you made yourself.',
+    'pathlib': 'Filesystem paths as objects rather than strings.',
+    'warnings': 'Silencing the warnings a library emits, or turning them into errors.',
+    'logging': 'Progress and diagnostics, with a level you can turn down.',
+}
+
+# Used only on Python 3.9 and older, where sys.stdlib_module_names does not
+# exist, to split "you must install this" from "this ships with Python".
+_STDLIB_FALLBACK = frozenset((
+    'random', 'math', 'os', 'sys', 're', 'time', 'json', 'collections',
+    'itertools', 'dataclasses', 'typing', 'csv', 'pickle', 'pathlib',
+    'warnings', 'logging', 'abc', 'copy', 'functools', 'io', 'string',
+    'datetime', 'argparse', 'subprocess', 'threading', 'unittest'))
+
+
+def _imported_names(code):
+    """Top-level module names the code imports, in the order they first appear.
+
+    Parsed rather than pattern-matched: an import inside a function or a
+    ``from x.y import z as w`` is still an import, and the words "import numpy"
+    inside a docstring are not. A pasted snippet is often a fragment that will
+    not parse, so that case falls back to reading the import lines.
+    """
+    names = []
+
+    def add(name):
+        head = str(name or '').split('.')[0]
+        if head and head not in names:
+            names.append(head)
+
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError):
+        for line in code.splitlines():
+            match = re.match(r'\s*(?:from|import)\s+([A-Za-z_][\w.]*)', line)
+            if match:
+                add(match.group(1))
+        return names
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                add(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            # `from . import x` names no module, so there is nothing to install.
+            if node.level == 0:
+                add(node.module)
+    return names
+
+
+def describe_packages(code):
+    """Every module a program imports, with what it is and what it is for.
+
+    Returns a list of ``{"name", "pip", "stdlib", "role"}`` with the ones that
+    need installing first - those are what stop the program running. Empty when
+    nothing is imported.
+    """
+    stdlib = getattr(sys, 'stdlib_module_names', _STDLIB_FALLBACK)
+    described = []
+    for name in _imported_names(str(code or '')):
+        is_stdlib = name in stdlib
+        described.append({
+            'name': name,
+            # Nothing to install for a module that ships with Python.
+            'pip': None if is_stdlib else PIP_NAMES.get(name, name),
+            'stdlib': is_stdlib,
+            'role': PACKAGE_ROLES.get(
+                name,
+                'Ships with Python; nothing to install.' if is_stdlib
+                else 'A third-party package this program imports.'),
+        })
+    described.sort(key=lambda pkg: (pkg['stdlib'], pkg['name'].lower()))
+    return described
+
 
 def save_code_to_file(code, topic):
     """

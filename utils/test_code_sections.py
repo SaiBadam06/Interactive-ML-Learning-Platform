@@ -56,6 +56,26 @@ def test_sections_returned_in_line_order():
     assert [s["title"] for s in _run(reply)] == ["First", "Second"]
 
 
+def test_identifier_titles_become_headings():
+    """Models return `imports_and_data` about as often as "Imports and data",
+    and the title is shown as a heading in the middle of prose."""
+    reply = json.dumps([
+        {"title": "imports_and_data", "start_line": 1, "end_line": 10, "explanation": "a"},
+        {"title": "The training loop", "start_line": 11, "end_line": 20, "explanation": "b"},
+    ])
+    titles = [s["title"] for s in _run(reply)]
+    assert titles == ["Imports and data", "The training loop"]
+
+
+def test_a_title_with_real_words_is_left_alone():
+    # An underscore inside a phrase is likely deliberate - a variable being named.
+    reply = json.dumps([
+        {"title": "setting learning_rate", "start_line": 1, "end_line": 10, "explanation": "a"},
+        {"title": "rest", "start_line": 11, "end_line": 20, "explanation": "b"},
+    ])
+    assert [s["title"] for s in _run(reply)][0] == "Setting learning_rate"
+
+
 def test_unusable_replies_degrade_to_empty():
     for reply in ("not json at all", "[]", None, "[{}]",
                   json.dumps([{"title": "A", "start_line": 1, "end_line": 5, "explanation": ""}])):
