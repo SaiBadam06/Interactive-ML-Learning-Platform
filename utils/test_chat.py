@@ -188,6 +188,50 @@ def test_pasted_code_is_walked_through_with_its_packages():
     assert pip == {"numpy": "numpy", "sklearn": "scikit-learn"}
 
 
+def test_a_slow_section_call_does_not_hang_the_whole_turn():
+    """Measured on the deployment: the section call ran past three minutes while
+    the learner watched a status line, and the function is killed at 300 s. It
+    is capped, and the answer that is already written still lands."""
+    flask_app = build()
+    client = client_with_session(flask_app)
+    flask_app.SECTIONS_BUDGET = 1
+
+    def crawl(*a, **k):
+        time.sleep(30)                      # far past the budget
+        return [{"title": "never seen", "code": "x", "explanation": "y",
+                 "start_line": 1, "end_line": 1}]
+
+    flask_app.explain_code_sections = crawl
+    stub(flask_app, [("content", "It trains a tiny model.")])
+    started = time.time()
+    done = events_from(post(client, {"messages": [{"role": "user", "content":
+        "```python\nimport torch\nmodel = torch.nn.Linear(2, 1)\nprint(model)\n```"}]}))[-1]
+    assert time.time() - started < 20, "the budget did not cut the wait short"
+    assert done["type"] == "done"
+    assert done["sections"] == []
+    assert "took too long" in done["note"]
+    # The half of the answer that cost nothing is still there.
+    assert [p["name"] for p in done["packages"]] == ["torch"]
+    assert done["code"]
+
+
+def test_a_slow_diagram_call_is_bounded_too():
+    """Same defect, same fix: the budget around the diagrams was inside a
+    `with ThreadPoolExecutor(...)`, whose exit waited for the call anyway."""
+    flask_app = build()
+    client = client_with_session(flask_app)
+    flask_app.IMAGE_BUDGET = 1
+    flask_app.generate_images = lambda *a, **k: (time.sleep(30), ["late.png"])[1]
+    stub(flask_app, [("content", "Attention weighs each token.\nDIAGRAM: boxes and arrows")])
+    started = time.time()
+    done = events_from(post(client, {"messages": [
+        {"role": "user", "content": "draw me a diagram of attention"}]}))[-1]
+    assert time.time() - started < 20, "the image budget did not cut the wait short"
+    assert done["type"] == "done"
+    assert "images" not in done
+    assert "taking too long" in done["note"]
+
+
 def test_a_walkthrough_survives_the_section_call_failing():
     """The prose already answered the question; a failed second call must not
     take the whole turn down with it."""

@@ -941,6 +941,12 @@ def route_mode(text):
 # How long a reply may spend reasoning before producing a word.
 THINKING_BUDGET = 75          # seconds
 IMAGE_BUDGET = 120            # seconds for the three diagrams
+# The breakdown is a second model call made after the answer is already on
+# screen. Measured on the deployment: it ran past three minutes with the learner
+# watching "Breaking it into sections", and the function is killed at 300 s -
+# which would end the stream with no answer and no error. The prose above is the
+# answer to their question, so this waits a reasonable time and then says so.
+SECTIONS_BUDGET = 45          # seconds
 
 CHAT_SYSTEM = (
     "You are a patient tutor for artificial intelligence and machine learning.\n"
@@ -1003,6 +1009,25 @@ MODE_QUOTA = {'explain': 'text', 'code': 'code', 'audio': 'audio', 'images': 'im
 def _sse(event):
     """One server-sent event."""
     return "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
+
+
+def _within(seconds, fn, *args):
+    """Run ``fn`` in a thread, wait at most ``seconds``, return None if it is
+    still going. The thread is left to finish and die on its own.
+
+    Deliberately not ``with ThreadPoolExecutor(...) as pool``. That was the
+    shape used here, and leaving the block calls ``shutdown(wait=True)``, which
+    blocks until the very call the timeout was meant to bound has returned - so
+    ``result(timeout=...)`` raised on schedule and then the with-statement sat
+    there anyway. Measured: a 1 s budget around a 30 s call took 30 s.
+    """
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        return pool.submit(fn, *args).result(timeout=seconds)
+    except FuturesTimeout:
+        return None
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 @app.route('/chat')
@@ -1163,14 +1188,19 @@ def api_chat():
             done['code'] = pasted
             done['packages'] = describe_packages(pasted)
             yield _sse({'type': 'working', 'label': 'Breaking it into sections'})
+            # The call tries two models, each with its own timeout, so left
+            # alone it can outlast the function it is running inside.
             try:
-                done['sections'] = explain_code_sections(api_key, pasted, topic, wording)
+                done['sections'] = _within(SECTIONS_BUDGET, explain_code_sections,
+                                           api_key, pasted, topic, wording) or []
             except Exception:
                 logger.warning("chat walkthrough sections failed", exc_info=True)
                 done['sections'] = []
             if not done['sections']:
-                done['note'] = ('The section-by-section breakdown could not be built for '
-                                'this one, but the explanation above still covers it.')
+                logger.warning("chat sections empty or past %ss", SECTIONS_BUDGET)
+                done['note'] = ('The breakdown into sections took too long, so here is the '
+                                'explanation on its own. The packages above are still right, '
+                                'and asking again often works.')
 
         elif mode == 'images':
             prompts = [line.split('DIAGRAM:', 1)[1].strip()
@@ -1181,19 +1211,16 @@ def api_chat():
                                                                '' if len(prompts) == 1 else 's')})
                 # generate_images retries per image and can sit for many minutes.
                 # A learner would be left on "Drawing 3 diagrams" with no way out
-                # but the Stop button, so give it a wall-clock budget. The thread
-                # is left to finish on its own; only the waiting is bounded.
+                # but the Stop button, so give it a wall-clock budget.
                 try:
-                    with ThreadPoolExecutor(max_workers=1) as pool:
-                        task = pool.submit(generate_images, prompts, api_key, topic)
-                        try:
-                            done['images'] = task.result(timeout=IMAGE_BUDGET) or []
-                            done['prompts'] = prompts
-                        except FuturesTimeout:
-                            logger.warning("chat images timed out after %ss", IMAGE_BUDGET)
-                            done['note'] = ('The diagrams are taking too long, so here is the '
-                                            'explanation on its own. Ask again to retry them.')
-                            pool.shutdown(wait=False, cancel_futures=True)
+                    images = _within(IMAGE_BUDGET, generate_images, prompts, api_key, topic)
+                    if images is None:
+                        logger.warning("chat images timed out after %ss", IMAGE_BUDGET)
+                        done['note'] = ('The diagrams are taking too long, so here is the '
+                                        'explanation on its own. Ask again to retry them.')
+                    else:
+                        done['images'] = images or []
+                        done['prompts'] = prompts
                 except Exception:
                     logger.warning("chat images failed", exc_info=True)
                     done['note'] = 'The diagrams could not be drawn, but the explanation is above.'
