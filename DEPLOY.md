@@ -88,6 +88,23 @@ four features once — the first request after a deploy pays a cold start.
 
 ## Things that will bite you
 
+**Invite and reset links need their landing page allow-listed in Supabase, or
+they go nowhere.** `admin_invite()` asks Supabase to send the recipient to
+`SITE_URL + /auth/callback`. Supabase only honours that `redirect_to` if it
+matches an entry in **Authentication → URL Configuration → Redirect URLs** in
+the Supabase dashboard; if it does not, Supabase silently sends the recipient
+to the dashboard's own Site URL instead - not an error, just a link that lands
+somewhere unrelated to this app. Add both:
+
+- `https://<your-production-domain>/auth/callback` - the deployed site
+- `http://127.0.0.1:5000/auth/callback` - only needed if an admin ever ticks
+  "Point the link at this host instead" while testing locally
+
+A genuinely expired or already-used link is a different, expected failure -
+Supabase reports that as `otp_expired` and the callback page says so plainly.
+If the page instead shows Supabase's raw error text, that is this
+misconfiguration, not a stale link.
+
 **Generated files are temporary.** On Vercel only `/tmp` is writable, and it is
 per-instance and wiped between cold starts. `app.py` detects this (via the
 `VERCEL` environment variable) and writes under `/tmp`; creating directories in

@@ -170,7 +170,16 @@
                     query.get('error_description') || query.get('error');
     var errorCode = hash.get('error_code') || query.get('error_code') || '';
     if (hashError) {
-        showDead(/expired|invalid|otp/i.test(errorCode + ' ' + hashError)
+        // Supabase's code for a spent or timed-out link is specifically
+        // otp_expired - both a real timeout and a reused token report it the
+        // same way. Matching on the bare word "invalid" here used to catch
+        // other failures too, such as "Requested path is invalid" when
+        // redirect_to is not on the project's allow-list, and relabel them as
+        // "already used or expired" - true sometimes, and actively misleading
+        // the rest of the time, since that one means the deployment is
+        // misconfigured rather than the link being stale. Anything that is not
+        // recognisably an expiry now shows Supabase's own words instead.
+        showDead(/otp_expired|expired/i.test(errorCode + ' ' + hashError)
             ? 'It has already been used or it has expired - invite and reset links work once.'
             : String(hashError).slice(0, 200));
         return;

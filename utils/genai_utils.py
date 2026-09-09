@@ -96,6 +96,16 @@ SCOPE = (
     "a learning rate or a transformer are all in scope even when the question "
     "never uses the words machine learning. General programming, maths or "
     "science questions with no connection to building a model are not.\n"
+    # A rushed or fat-fingered question read as gibberish before it read as
+    # in-scope: measured against the live model, "wut is gradiant decent" and
+    # "randon forset" both got the refusal sentence, when the only thing wrong
+    # with them was spelling. Named examples work far better here than a
+    # general instruction to "read past typos" did.
+    "A rushed or misspelled question is still in scope if the term it is "
+    "reaching for is: for example \"gradiant decent\" means gradient descent, "
+    "\"randon forset\" means random forest, \"transfromer achitecture\" means "
+    "transformer architecture, \"ChAID sqaure\" means CHAID (a decision-tree "
+    "method). Answer the corrected term rather than refusing over spelling.\n"
 )
 
 
