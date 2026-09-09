@@ -153,47 +153,26 @@ This will install:
 
 ### NVIDIA NIM API Key (Required)
 
-1. **Visit Google AI Studio**
+One key covers everything - text, code, audio and image generation all call
+the same NVIDIA NIM endpoint, so there is nothing separate to get for images.
+
+1. **Get a key**
    - Go to [https://build.nvidia.com](https://build.nvidia.com)
-   - Sign in with your Google account
+   - Sign in and click "Get API Key"
+   - Copy the generated key (starts `nvapi-`)
 
-2. **Create API Key**
-   - Click "Create API Key"
-   - Copy the generated key
-
-3. **Save the Key**
-   
-   **Option A: Using .env file**
+2. **Save it to `.env`**
    ```bash
    # Copy example file
    cp .env.example .env
-   
+
    # Edit .env file
-   # Add your key: NVIDIA_API_KEY=your_actual_key_here
+   # Add your key: NVIDIA_API_KEY=nvapi-your_actual_key_here
    ```
 
-   **Option B: Using Settings Page (Recommended)**
-   - Start the application (see next section)
-   - Navigate to Settings page
-   - Enter your API key
-   - Click "Save Settings"
-
-### NVIDIA NIM API Key (Optional)
-
-Only needed if you want to use FLUX.1-dev for image generation.
-
-1. **Visit NVIDIA NIM**
-   - Go to [https://build.nvidia.com](https://build.nvidia.com)
-   - Create account if needed
-
-2. **Create Token**
-   - Click "New token"
-   - Give it a name
-   - Select "Read" permissions
-   - Copy the token
-
-3. **Save in Settings**
-   - Add to .env file or Settings page
+That is the only place it is set. There is no per-user key entry in the app -
+one key, set once, and every signed-in account shares it against the daily
+generation limit.
 
 ---
 
@@ -225,14 +204,7 @@ or
 http://127.0.0.1:5000
 ```
 
-### Step 3: Configure API Keys
-
-1. Click on "Settings" in the navigation
-2. Enter your NVIDIA NIM API key
-3. Optionally enter NVIDIA NIM key
-4. Click "Save Settings"
-
-### Step 4: Start Learning!
+### Step 3: Start Learning!
 
 Choose any feature:
 - **Text Explanation**: Get text-based explanations
@@ -382,11 +354,10 @@ Run this checklist:
 - [ ] Python 3.8+ installed
 - [ ] Virtual environment created and activated
 - [ ] Dependencies installed without errors
-- [ ] NVIDIA NIM API key obtained
+- [ ] NVIDIA_API_KEY set in .env
 - [ ] Application starts without errors
 - [ ] Can access http://localhost:5000
-- [ ] Can generate text explanations
-- [ ] Settings page saves API keys
+- [ ] Chat answers a question
 
 If all checks pass, you're ready to start learning! 🎉
 

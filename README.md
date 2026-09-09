@@ -64,13 +64,12 @@ An intelligent, AI-powered web application for learning Machine Learning concept
    pip install -r requirements.txt
    ```
 
-4. **Configure environment variables (optional)**
+4. **Configure environment variables**
    ```bash
    # Copy the example env file
    cp .env.example .env
-   
-   # Edit .env and add your API keys
-   # Note: You can also add API keys through the Settings page
+
+   # Edit .env and add your API key - this is the only required step
    ```
 
 5. **Run the application**
@@ -86,10 +85,9 @@ An intelligent, AI-powered web application for learning Machine Learning concept
 ## 📖 Usage Guide
 
 ### First Time Setup
-1. Navigate to the **Settings** page
-2. Enter your NVIDIA NIM API key (required)
-3. Optionally add NVIDIA NIM API key for FLUX.1-dev
-4. Click "Save Settings" - keys are stored locally in your browser
+There is nothing to configure in the app itself - one `NVIDIA_API_KEY` in `.env`
+covers text, code, audio and images, and every signed-in account shares it. Just
+open the app and start a chat.
 
 ### Generating Content
 
@@ -173,7 +171,7 @@ ml_learning_assistant/
 Create a `.env` file based on `.env.example`:
 
 ```env
-# API Keys (Optional - can be set in Settings page)
+# Required - free at build.nvidia.com
 NVIDIA_API_KEY=nvapi-your_key_here
 
 # Flask Configuration
@@ -183,8 +181,8 @@ FLASK_DEBUG=True
 ```
 
 ### API Keys
-- **NVIDIA NIM API Key**: Required for all features. Get it from [Google AI Studio](https://build.nvidia.com)
-- **NVIDIA NIM API Key**: Optional, only needed if using FLUX.1-dev for image generation
+- **NVIDIA_API_KEY**: Required, one key covers everything - text, code, audio and
+  image generation. Get it from [build.nvidia.com](https://build.nvidia.com)
 
 ## 🎨 Features in Detail
 
@@ -228,8 +226,8 @@ pip install -r requirements.txt --upgrade
 
 **Issue**: API key errors
 ```bash
-# Solution: Verify your API keys are correct
-# Check Settings page or .env file
+# Solution: Check NVIDIA_API_KEY in .env (or the deployment's environment
+# variables on Vercel) - that is the only place it is set
 ```
 
 **Issue**: Audio generation fails

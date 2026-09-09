@@ -18,19 +18,14 @@ Complete guide to using all features of the ML Learning Assistant.
 ### First Time Setup
 
 1. **Launch the Application**
+   - Set `NVIDIA_API_KEY` in `.env` (see INSTALLATION.md) - there is nothing to
+     configure inside the app itself
    - Start the server: `python app.py`
    - Open browser: `http://localhost:5000`
 
-2. **Configure API Keys**
-   - Click "Settings" in navigation
-   - Enter your NVIDIA NIM API key
-   - Optionally add NVIDIA NIM key
-   - Click "Save Settings"
-
-3. **Explore the Homepage**
-   - Read feature descriptions
-   - Choose your preferred learning mode
-   - Click on any feature card to start
+2. **Explore the Homepage**
+   - Type a topic and pick Explain, Code, Audio or Images, or open the Chat
+   - Browse the suggested topics for ideas
 
 ---
 
@@ -316,45 +311,27 @@ Generate AI-powered diagrams and technical illustrations to understand ML concep
 
 ## Settings
 
-### API Key Management
+There is no API key to manage here - `NVIDIA_API_KEY` is set once in the
+deployment's `.env` (see INSTALLATION.md) and every signed-in account shares
+it. The Settings page itself covers:
 
-**Saving Keys**
-1. Go to Settings page
-2. Enter NVIDIA NIM API key (required)
-3. Enter NVIDIA NIM key (optional)
-4. Click "Save Settings"
-5. Keys stored locally in browser
+- **Your account** - who you are signed in as, and today's generation count
+  against the daily limit
+- **Access** - whether accounts are on for this deployment, and an invite link
+  for admins
+- **Models** - which provider and models are in use; "View technical details"
+  shows versions and capabilities
+- **Setup** - for admins only: the full list of environment variables the
+  deployment reads from `.env`
 
-**Security**
-- Keys stored in browser localStorage only
-- Never transmitted to our servers
-- Can clear anytime
-- Encrypted by browser
+### Privacy
 
-**Clearing Keys**
-1. Click "Clear All Settings"
-2. Confirm action
-3. Re-enter when needed
-
-### Model Information
-
-Click "View Technical Details" to see:
-- Model versions
-- Parameters
-- Capabilities
-- API endpoints
-
-### Privacy Settings
-
-**What We Store**
-- API keys (locally in browser)
-- Nothing else!
-
-**What We Don't Store**
-- Your queries
-- Generated content
-- Personal information
-- Usage data
+Recently studied topics live in your browser's local storage and never leave
+it. Code you run stays in your browser too - Pyodide executes it locally, and
+none of it is sent to a server. When accounts are on, saved lessons and your
+daily generation count are stored against your account; the topics you type
+are sent to the model provider to generate content. No analytics, no
+advertising, no third-party tracking.
 
 ---
 

@@ -57,19 +57,13 @@ python app.py
 
 ## 🔑 First Time Configuration
 
-### Step 1: Get Your API Key
-1. Visit [Google AI Studio](https://build.nvidia.com)
-2. Sign in with Google
-3. Click "Create API Key"
-4. Copy the key
+### Get Your API Key
+1. Visit [build.nvidia.com](https://build.nvidia.com)
+2. Sign in and click "Get API Key"
+3. Copy the key into `.env` as `NVIDIA_API_KEY=nvapi-...`
 
-### Step 2: Configure in App
-1. Open http://localhost:5000 in your browser
-2. Click "Settings" in the top menu
-3. Paste your API key
-4. Click "Save Settings"
-
-That's it! You're ready to go! 🎉
+That's the only setup step - there is nothing to configure inside the app.
+Open http://localhost:5000 and start a chat. 🎉
 
 ---
 
